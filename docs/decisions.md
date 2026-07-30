@@ -207,8 +207,8 @@ simulator is not the problem; reusing weights across a change in contention is.
 The direction is consistent and worth stating plainly: **extrapolating from a low executor count to
 a high one is optimistic, and from a high one to a low one is pessimistic.**
 
-The knee is better behaved, though not as robust as an earlier version of this entry claimed. It is
-decided by the critical path, which does not depend on the executor count at all, against total work,
+The knee is better behaved, within limits. It is decided by the critical path, which does not depend
+on the executor count at all, against total work,
 which rescales but does not reorder — so it is untouched by the extrapolation error that ruins an
 absolute time. "Beyond about six cores this build stops getting faster" survives a 30% weight error;
 "this build takes 18.1 s on two cores" does not.

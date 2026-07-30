@@ -265,7 +265,7 @@ arranged as `<project>-j<N>-r<run>/` directories under one root, then:
 `cargo metadata` is not optional. Cargo passes *relative* source paths for workspace-local crates and
 a package name need not match its directory: bevy has several distinct packages in directories all
 named `macros`, and ripgrep's binary lives in `crates/core` while the package is `ripgrep`. Guessing
-from the path silently dropped ten of bevy's units in an earlier attempt.
+from the path silently drops units: on bevy it loses ten of the 419.
 
 The captures are not committed - they run to hundreds of megabytes and are machine-specific.
 Absolute times will differ on other hardware; the ratios, and the direction of the job-count error,

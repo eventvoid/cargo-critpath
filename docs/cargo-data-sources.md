@@ -180,8 +180,8 @@ a full, clean build is required either way.
 
 ### Build-script executions are in the log too
 
-An earlier version of this document said build-script *executions* appear only in the timing report.
-They do not: the verbose log records each one as a bare execution of the compiled script,
+Build-script *executions* are not confined to the timing report. The verbose log records each one as
+a bare execution of the compiled script,
 
     Running `/…/target/debug/build/serde_core-c9c71f116f26aaba/build-script-build`
 
@@ -199,7 +199,7 @@ directory both marks it as a build script and names its package, workspace-local
 worth more than `--crate-name`, which is only `build_script_build` when the file is called
 `build.rs`.
 
-### Other details that each cost a wrong answer before they were noticed
+### Other details, each of which will produce a wrong answer if missed
 
 - **`UNIT_DATA`'s `i` is not the array index.** The array is in start order; `i` is a permutation
   matching Cargo's own sorted unit list, and `unblocked_units` refers to `i`. Indexing the array by

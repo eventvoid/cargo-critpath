@@ -144,8 +144,8 @@ was worth hand-writing the argument parsing for.
 It needs a clean, full build. A cached unit is reported with a duration of zero, so a graph built from
 an incremental build is almost entirely zero-weight, and the tool refuses it. `-v` gives the
 structure, `--timings` the weights, and `cargo metadata` attributes workspace-local crates to
-packages — that last one is not optional, since guessing from source paths silently dropped ten of
-bevy's units in an earlier attempt.
+packages — that last one is not optional, because a package name need not match its directory and
+guessing from source paths silently drops units.
 
     cargo clean
     cargo build --timings -v --offline 2> build.log
