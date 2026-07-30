@@ -178,6 +178,42 @@ than by name, and no part of Cargo's unit-construction logic has to be guessed a
 `-v` prints `rustc` lines only for dirty units, which composes with the fresh-unit problem above:
 a full, clean build is required either way.
 
+### Build-script executions are in the log too
+
+An earlier version of this document said build-script *executions* appear only in the timing report.
+They do not: the verbose log records each one as a bare execution of the compiled script,
+
+    Running `/…/target/debug/build/serde_core-c9c71f116f26aaba/build-script-build`
+
+with no `rustc` and no arguments. Three consequences, and they simplify everything:
+
+- the `Running` lines are **one-to-one** with `UNIT_DATA` — verified 54/54, 119/119, 308/308 and
+  419/419 on the four measured projects;
+- the compile-to-run edge is *stated* rather than synthesised from Cargo's three-unit pattern;
+- an execution inherits its compilation's package, version and features through the hash in that
+  path, so it needs no separate attribution.
+
+A build-script **compilation** is likewise identified exactly, by its `--out-dir`: Cargo places build
+scripts under `target/<profile>/build/<package>-<hash>` and everything else under `deps`, so the
+directory both marks it as a build script and names its package, workspace-local or not. That is
+worth more than `--crate-name`, which is only `build_script_build` when the file is called
+`build.rs`.
+
+### Other details that each cost a wrong answer before they were noticed
+
+- **`UNIT_DATA`'s `i` is not the array index.** The array is in start order; `i` is a permutation
+  matching Cargo's own sorted unit list, and `unblocked_units` refers to `i`. Indexing the array by
+  it silently misattributes every pair.
+- **`sections` is `null`, not `[]`,** for a unit that is not pipelined.
+- **`Total time` is not always `N.Ns`.** Over a minute it reads `61.2s (1m 1.2s)`.
+- **`DURATION` is not the build's total.** It is the chart's axis ceiling: a build whose header says
+  `Total time: 6.1s` carries `DURATION = 7;`.
+- **`--crate-type bin` is written explicitly**, so "no `--crate-type` means a binary" is necessary
+  but not sufficient, and treating its absence as the only signal loses every binary in the build.
+- **`--extern proc_macro` has no `=path`** and is not an edge.
+- **`Max concurrency` holds three numbers**, as in `12 (jobs=10 ncpu=10)`.
+- **The header does not contain Cargo's version**, only rustc's.
+
 ## Cargo's scheduler, and what it means for prediction
 
 Read from Cargo's source, at commit `0d83fa6`:
