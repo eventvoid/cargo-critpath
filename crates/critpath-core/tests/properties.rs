@@ -1153,15 +1153,21 @@ fn i9_slack_is_never_negative_and_is_zero_along_the_critical_path() {
         let expected_starts = latest_starts(&graph, &analysis);
 
         // Once the weights are large enough that the sums saturate, the latest-finish time is a
-        // difference of numbers that no longer stand for what they say, and it degenerates. The
-        // slack assertions below still apply there; the ones about `lft` do not. The degeneracy
-        // itself is pinned down in `saturating_weights_degrade_without_panicking`.
+        // difference of numbers that no longer stand for what they say, so it cannot be compared
+        // against an independently derived one. It is still required to be meetable, which is
+        // asserted for every graph below, saturating or not.
         let saturated = cp == INF;
 
         for (id, unit) in graph.units() {
             let eft = analysis.earliest_finish(id).unwrap();
             let lft = analysis.latest_finish(id).unwrap();
             let slack = analysis.slack(id).unwrap();
+            // A unit can always finish at the earliest time it can, so a deadline earlier than that
+            // is not a deadline. This holds whether or not the sums saturated.
+            assert!(
+                lft >= eft,
+                "unit {id} may finish at {eft} at the earliest but is told to finish by {lft}"
+            );
             assert!(
                 lft <= cp,
                 "graph {index}: unit {id} may finish after the critical path"
@@ -2264,12 +2270,14 @@ fn saturating_weights_degrade_without_panicking() {
     for &id in &all {
         assert!(analysis.slack(id).unwrap() >= Millis::ZERO);
     }
-    // But the first unit is told to finish before it can, which is what saturation costs.
-    assert!(
-        analysis.latest_finish(all[0]).unwrap() < analysis.earliest_finish(all[0]).unwrap(),
-        "the latest-finish time no longer degenerates under saturation; if that is now handled, \
-         the corpus check in i9 can drop its exclusion of saturating graphs"
-    );
+    // And a deadline is still meetable: the backward pass subtracts from the saturated total, so
+    // without a floor at the earliest finish the first unit would be told to finish before it can.
+    for &id in &all {
+        assert!(
+            analysis.latest_finish(id).unwrap() >= analysis.earliest_finish(id).unwrap(),
+            "unit {id} is told to finish before the earliest it can"
+        );
+    }
 
     // The bounds of sections 5 and 6 still hold, and nothing panics.
     for count in [1u32, 2, 5] {

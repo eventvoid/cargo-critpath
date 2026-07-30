@@ -158,7 +158,7 @@ pub fn analyze(graph: &BuildGraph) -> Analysis {
     let count = graph.len();
     let (earliest_start, earliest_finish, reason) = forward_pass(graph, count);
     let (critical_path_len, attaining) = latest_finisher(graph, &earliest_finish);
-    let latest_finish = backward_pass(graph, count, critical_path_len);
+    let latest_finish = backward_pass(graph, count, critical_path_len, &earliest_finish);
     let (path, contribution) = recover_path(graph, count, attaining, &reason);
 
     Analysis {
@@ -269,7 +269,12 @@ fn forward_pass(
 /// The mirror of [`forward_pass`]: one visit per edge in reverse topological order. The closure
 /// rule has to be applied here too, or a unit that a linker somewhere is waiting for would be
 /// reported as movable.
-fn backward_pass(graph: &BuildGraph, count: usize, critical_path_len: Millis) -> Vec<Millis> {
+fn backward_pass(
+    graph: &BuildGraph,
+    count: usize,
+    critical_path_len: Millis,
+    earliest_finish: &[Millis],
+) -> Vec<Millis> {
     let mut latest_finish = vec![critical_path_len; count];
     // The earliest latest-start of any unit that requires this unit's closure, whether or not it is
     // a direct dependent. The mirror of `maxFullEft`, and derived the same way.
@@ -318,8 +323,16 @@ fn backward_pass(graph: &BuildGraph, count: usize, critical_path_len: Millis) ->
         if let Some(slot) = closure_cap.get_mut(id.index()) {
             *slot = cap;
         }
+        // A unit can always finish at its earliest possible time without delaying anything, so its
+        // deadline is never earlier than that. The two coincide except when the critical path has
+        // saturated, where subtracting from the clamped total would otherwise produce a deadline
+        // that cannot be met.
+        let floor = earliest_finish
+            .get(id.index())
+            .copied()
+            .unwrap_or(Millis::ZERO);
         if let Some(slot) = latest_finish.get_mut(id.index()) {
-            *slot = bound;
+            *slot = bound.max(floor);
         }
     }
 
