@@ -4,7 +4,14 @@
 //! cargo 1.95.0 and pin the refusals that keep a changed shape from turning into a wrong number.
 
 // A test asserting a parse result is allowed to unwrap: a panic is the failure report.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+// The integer division below is a deliberate `len * 3 / 4` cut point for a truncation test.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::integer_division,
+    clippy::panic
+)]
 
 use cargo_critpath::{ParseError, TimingTarget};
 use critpath_core::Millis;
@@ -167,7 +174,11 @@ fn a_truncated_report_is_refused_rather_than_half_read() {
 
 #[test]
 fn an_entry_missing_a_field_is_named_rather_than_skipped() {
-    let text = report(0, 1, r#"{"i":0,"name":"a","version":"1.0.0","target":""}"#);
+    let text = report(
+        0,
+        1,
+        r#"{"i":0,"name":"a","version":"1.0.0","target":"","features":[],"start":0.0}"#,
+    );
     assert_eq!(
         cargo_critpath::parse_timing_report(&text).unwrap_err(),
         ParseError::BadUnitField {

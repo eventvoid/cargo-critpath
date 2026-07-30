@@ -16,9 +16,11 @@
 #![forbid(unsafe_code)]
 
 mod error;
+mod timings;
 mod verbose;
 
 pub use error::{ParseError, UnitDescription};
+pub use timings::{parse as parse_timing_report, TimingReport, TimingTarget, TimingUnit};
 pub use verbose::{
     parse as parse_verbose_log, ExternRef, Invocation, PackageRef, Role, VerboseLog,
 };
