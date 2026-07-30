@@ -327,8 +327,10 @@ fn executors(out: &mut dyn Write, findings: &Findings) -> io::Result<()> {
         "  ",
         "Beyond the knee, total work divided between the executors falls under the critical path, \
          so more of them cannot shorten this build. The knee is decided by the critical path and by \
-         total work, neither of which depends on the executor count, so it survives the weight \
-         error below. An absolute time does not.",
+         total work, neither of which depends on the executor count, so it is not affected by the \
+         extrapolation error below in the way an absolute time is. It does still move with ordinary \
+         run-to-run variation, because total work does: repeated clean builds of ripgrep put it at \
+         6 and at 7. Treat it as a small range, not a threshold.",
     )?;
     writeln!(out)?;
     writeln!(

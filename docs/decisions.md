@@ -207,10 +207,15 @@ simulator is not the problem; reusing weights across a change in contention is.
 The direction is consistent and worth stating plainly: **extrapolating from a low executor count to
 a high one is optimistic, and from a high one to a low one is pessimistic.**
 
-The knee, by contrast, is robust. It is decided by the critical path, which does not depend on the
-executor count at all, against total work, which rescales but does not reorder. "Beyond about six
-cores this build stops getting faster" survives a 30% error in the weights; "this build takes
-18.1 s on two cores" does not.
+The knee is better behaved, though not as robust as an earlier version of this entry claimed. It is
+decided by the critical path, which does not depend on the executor count at all, against total work,
+which rescales but does not reorder — so it is untouched by the extrapolation error that ruins an
+absolute time. "Beyond about six cores this build stops getting faster" survives a 30% weight error;
+"this build takes 18.1 s on two cores" does not.
+
+But the knee does move with ordinary run-to-run variation, because total work does. Three repeated
+clean builds of ripgrep put it at 7, 6 and 6. So it is reported as a single number with that
+qualification, and it should be read as a small range rather than a threshold.
 
 **Rejected: dropping the scenario.** The knee is the most actionable single number the tool
 produces, and it is trustworthy.
