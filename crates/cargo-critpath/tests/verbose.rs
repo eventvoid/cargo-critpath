@@ -394,3 +394,33 @@ fn a_quoted_windows_path_keeps_its_separators() {
         Some("-2222222222222222")
     );
 }
+
+#[test]
+fn unc_and_extended_length_windows_paths_are_read() {
+    // A build on a network share gives `\\server\share\…`, and one whose paths exceed the legacy
+    // length limit gives the `\\?\C:\…` prefix. Both begin with separators that produce empty path
+    // components, which must not disturb reading the file name or the enclosing directory.
+    let text = "   Compiling demo v0.1.0\n\
+         Running `\\\\?\\C:\\tc\\bin\\rustc.exe --crate-name unicode_ident --edition=2021 \
+         \\\\server\\share\\reg\\unicode-ident-1.0.20\\src\\lib.rs --crate-type lib \
+         --emit=dep-info,metadata,link -C metadata=aaaa0000aaaa0000 \
+         -C extra-filename=-1111111111111111 --out-dir \\\\?\\C:\\ws\\target\\debug\\deps`\n\
+         Running `\\\\?\\C:\\ws\\target\\debug\\build\\libc-2222222222222222\\\
+         build-script-build.exe`\n";
+    let parsed = cargo_critpath::parse_verbose_log(text).unwrap();
+
+    assert_eq!(parsed.invocations.len(), 2);
+    assert_eq!(parsed.invocations[0].crate_name, "unicode_ident");
+    let package = parsed.invocations[0].registry_package.as_ref().unwrap();
+    assert_eq!(package.name, "unicode-ident");
+    assert_eq!(package.version, "1.0.20");
+
+    // The build-script execution is still recognised, and still attributed to its package, through
+    // an extended-length prefix.
+    assert_eq!(parsed.invocations[1].role, Role::BuildScriptRun);
+    assert_eq!(parsed.invocations[1].run_package.as_deref(), Some("libc"));
+    assert_eq!(
+        parsed.invocations[1].run_artifact.as_deref(),
+        Some("-2222222222222222")
+    );
+}
