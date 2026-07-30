@@ -247,6 +247,53 @@ happens not to bind at the default, while staying silent about the unknown that 
 **Rejected: a single number at `f = 1/2`.** Splitting a crate exactly in half by compile time is
 the least likely outcome of a real refactor.
 
+## D13 — A saving is not reported as a saving unless it clears the noise floor
+
+**Decided.** The tool accepts more than one timing report for the same build
+(`--timings <path>` repeated). With several it measures the run-to-run spread and marks any saving
+below that spread as not actionable. With only one it cannot know the spread, says so, and cites the
+measured figures below rather than inventing a threshold.
+
+**Why.** Three clean builds per project at `-j 10` gave these critical path lengths:
+
+    ripgrep         5800 / 5970 / 5570 ms      spread  400 ms   ( 6.9% of the median)
+    async-graphql  18160 / 16520 / 18030 ms    spread 1640 ms   ( 9.1%)
+    rust-analyzer  58580 / 58470 / 57260 ms    spread 1320 ms   ( 2.3%)
+
+And the top split recommendation for ripgrep was a saving of **300 ms** — comfortably *inside* its
+own 400 ms spread. Printed on its own, that number is indistinguishable from noise while looking
+like a finding. A tool that recommends work on the strength of a number smaller than its own
+measurement error is worse than no tool, which is the first non-negotiable in this project.
+
+Note also that the spread is not a fixed percentage: 2.3% on the largest project and 9.1% on the
+middle one. So a hard-coded percentage threshold would be wrong in both directions, which is why
+the spread is measured when it can be and declared unknown when it cannot.
+
+**Rejected: a fixed percentage threshold.** The three measurements above span 2.3% to 9.1%. Any
+constant is wrong somewhere, and being wrong quietly is the failure mode that matters.
+
+**Rejected: reporting savings unqualified and leaving the judgement to the reader.** The reader has
+no way to know the spread — it takes several clean builds to find out, which is exactly the work the
+tool is supposed to have done for them.
+
+**Rejected: suppressing sub-threshold savings entirely.** They are still evidence about the shape of
+the graph, and hiding data is its own dishonesty. They are labelled, not removed, and they sort below
+everything that clears the floor.
+
+## D14 — Rank units by contribution, not by membership of the path
+
+**Decided.** The primary output ranks units by how much time they contribute to the critical path.
+Membership of the path is shown but is not the ranking key.
+
+**Why.** Across three repeat builds of the same commit, the *tail* of the critical path was
+identical every time, but the *head* was not: async-graphql sometimes began with `proc-macro2`'s
+build-script chain and sometimes with `quote`'s, and rust-analyzer did the same, because those chains
+are interchangeable and near-equal in length. Path membership at the margin therefore flips between
+runs of the same build, while the ranking by contribution does not move.
+
+Reporting "these 22 units are on the critical path" invites a reader to trust a boundary that is not
+stable. Reporting "these units contribute this much" is stable, and is the thing worth acting on.
+
 ## D9 — MSRV 1.74.0
 
 **Decided.** `rust-version = "1.74.0"`, checked in CI on that exact toolchain.
