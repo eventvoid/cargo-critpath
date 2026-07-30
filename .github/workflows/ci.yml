@@ -51,3 +51,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo doc --workspace --no-deps --all-features
       - run: cargo test --workspace --doc
+
+  package:
+    name: packaging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # Packages both crates, extracts each tarball and compiles it in isolation. This is what
+      # catches a file the tests read but the package does not ship, which no other job can see.
+      - run: cargo publish --dry-run --workspace

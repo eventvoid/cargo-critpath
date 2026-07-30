@@ -1,7 +1,7 @@
 //! Simulating a build on a bounded number of executors, and the bounds that hold whatever the
 //! scheduler does.
 //!
-//! Section 5 of `docs/model.md` defines the simulator and section 6 the two bounds. The bounds are
+//! Section 5 of [`docs/model.md`](https://github.com/eventvoid/cargo-critpath/blob/main/docs/model.md) defines the simulator and section 6 the two bounds. The bounds are
 //! guarantees; the simulated makespan is an estimate, because the ordering it reproduces is one
 //! Cargo itself only follows up to hash iteration order.
 

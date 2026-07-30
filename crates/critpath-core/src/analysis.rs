@@ -1,7 +1,7 @@
 //! Earliest and latest times over a build graph.
 //!
 //! This is the part of the tool that does not depend on how many executors a build gets: the
-//! critical path length, and how much room every unit beside it has. Section 4 of `docs/model.md`
+//! critical path length, and how much room every unit beside it has. Section 4 of [`docs/model.md`](https://github.com/eventvoid/cargo-critpath/blob/main/docs/model.md)
 //! defines what is computed here and section 7 lists the invariants the tests cite.
 
 use crate::graph::{BuildGraph, EdgeKind, UnitId};
@@ -85,7 +85,7 @@ impl Analysis {
     ///
     /// Consecutive units need not be joined by an edge: a unit that requires its whole closure is
     /// preceded on the path by the unit in that closure which held it back, which section 3.1 of
-    /// `docs/model.md` shows need not be a direct dependency.
+    /// [`docs/model.md`](https://github.com/eventvoid/cargo-critpath/blob/main/docs/model.md) shows need not be a direct dependency.
     #[must_use]
     pub fn critical_path(&self) -> &[UnitId] {
         &self.path

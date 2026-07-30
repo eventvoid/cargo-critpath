@@ -5,20 +5,32 @@ anything: the first command that succeeds cannot be undone.
 
 ## What cannot be undone
 
-Publishing a version is permanent. A published version can be **yanked**, which is not deletion:
+**A published version cannot be deleted, only yanked.** Yanking tells Cargo not to select the
+version for new dependency resolution. The version stays on crates.io, its files stay downloadable,
+its documentation stays up, and any `Cargo.lock` that already pins it keeps resolving. It exists to
+stop *new* projects picking a version you have decided is broken, not to make one disappear:
 
-- **Yanking** tells Cargo not to select the version for new dependency resolution. The version stays
-  on crates.io, its files stay downloadable, its documentation stays up, and any `Cargo.lock` that
-  already pins it keeps resolving. It exists to stop *new* projects picking a version you have
-  decided is broken. `cargo yank --version 0.1.0 critpath-core`, and `--undo` to reverse it.
-- **Deletion** is not available. There is no command, and the registry will not do it on request
-  except for genuine legal or security emergencies. Assume every byte you upload is public forever.
+    cargo yank --version 0.1.0 critpath-core     # and --undo to reverse it
 
-The **crate name** is also permanent. Publishing `critpath-core` reserves that name for this
-account; nobody else can ever take it, and you cannot rename the crate — a new name is a new crate
-and the old one keeps existing.
+**A whole crate can be deleted, under conditions, and only from the website.** There is no Cargo
+subcommand. The registry allows an owner to delete a crate when either:
 
-So the version number, the contents of the tarball, and the metadata on the crates.io page are all
+- it was first published **less than 72 hours** ago; or
+- it has a **single owner**, has been downloaded fewer than **1000 times for each month** it has
+  existed, and **no crate on crates.io depends on it**.
+
+A team cannot delete; only a user owner can. The name becomes available again **24 hours** after
+deletion.
+
+That 72-hour window is the real escape hatch for a first release: if `critpath-core 0.1.0` goes out
+with something wrong in the tarball, it can be removed and the version number reused. After the
+window closes, or once the other crate depends on it, the only remedy is to yank and publish a new
+version.
+
+Outside those conditions the **crate name** is permanent. Nobody else can take it, and a crate
+cannot be renamed — a new name is a new crate and the old one keeps existing.
+
+So treat the version number, the contents of the tarball, and the metadata on the crate page as
 one-way. That is why `--dry-run` exists and why it should be run every time.
 
 ## Before you start
@@ -68,44 +80,54 @@ version:
 
     critpath-core = { version = "0.1.0", path = "crates/critpath-core" }
 
-The path is what the workspace builds against; the version is what the published crate records.
-crates.io does not accept a package whose dependency cannot be resolved from the registry, so
-**`critpath-core` must be published, and its version must exist on the index, before
-`cargo-critpath` can be packaged at all** — not merely before it is published. Attempting the
-dependent crate first fails with:
+The path is what the workspace builds against; the version is what the published crate records. The
+registry will not accept a package whose dependency cannot be resolved from the index, so
+`critpath-core` must reach the index before `cargo-critpath` is uploaded.
 
+Publishing them one at a time makes that ordering the operator's problem, and worse, it makes the
+first upload — the irreversible one — happen while the second crate is still unverified. Publishing
+them one at a time also means this fails, which is correct but unhelpful as a pre-flight:
+
+    $ cargo publish --dry-run -p cargo-critpath
     error: failed to prepare local package for uploading
     Caused by:
       no matching package named `critpath-core` found
       location searched: crates.io index
 
-This also means `cargo publish --dry-run -p cargo-critpath` cannot succeed before the first crate is
-released. That is expected, and it is not a reason to skip the dry run on the other crate.
+Since Cargo 1.90, `--workspace` handles both crates in one command and works out the order itself,
+resolving the inter-crate dependency through a temporary local registry rather than the real index.
+That verifies *both* tarballs before anything is uploaded, which is what makes the first upload safe:
+
+    cargo publish --dry-run --workspace
+
+**`cargo publish --workspace` is not atomic.** A server-side error partway through can leave the
+workspace partially published — the first crate live and the second not. That is recoverable, since
+the missing crate can simply be published again, but do not assume a failure means nothing happened.
+
+On Cargo older than 1.90, fall back to publishing in dependency order by hand: `critpath-core`
+first, wait for the index, then `cargo-critpath`.
 
 ## Publishing
 
-Dry-run first. This packages the crate, extracts the tarball, and compiles it in isolation, which is
-the only check that catches a file the tests need but the package does not contain:
+Dry-run the whole workspace first. This packages both crates, extracts each tarball, and compiles it
+in isolation, which is the only check that catches a file the tests need but the package omits:
 
-    cargo publish --dry-run -p critpath-core
+    cargo publish --dry-run --workspace
 
-Read the file list it prints. Anything unexpected in there is public forever.
+Read both file lists it prints. Anything unexpected in there is public forever. Expect 21 files for
+`critpath-core` and 40 for `cargo-critpath`; a number that has dropped means something the tests read
+is no longer being shipped.
 
-Then, in order:
+Then release:
 
-    cargo publish -p critpath-core
+    cargo publish --workspace
 
-Wait for the index to update — usually seconds, occasionally a minute. Confirm the version is
-resolvable before continuing, because the next command reads the index:
+Confirm both are live, and that the versions resolve from the index rather than from your checkout:
 
     cargo search critpath-core
+    cargo search cargo-critpath
 
-Now the second crate can be verified and published:
-
-    cargo publish --dry-run -p cargo-critpath
-    cargo publish -p cargo-critpath
-
-Finally, push the tag if it is not already pushed:
+Finally, push the tag:
 
     git push origin v0.1.0
 
@@ -118,9 +140,21 @@ pins it. To release `0.2.0`:
 2. Change the version requirement on the path dependency in the same file, in
    `[workspace.dependencies]`. Forgetting this publishes a `cargo-critpath` that depends on the *old*
    `critpath-core`, which resolves and compiles, so nothing will tell you.
-3. Run `cargo build` so `Cargo.lock` is updated, and commit both.
-4. Tag it, annotated, with a message that says what changed and what is still unresolved.
-5. Repeat the gate and the two publishes in the same order.
+3. Regenerate both golden files. They embed the crate version, so the suite fails until they are
+   rebuilt — loudly, but it is easy to mistake for a real regression:
+
+       cargo run -q -p cargo-critpath -- critpath \
+         --log crates/cargo-critpath/tests/fixtures/workspace/verbose.log \
+         --timings crates/cargo-critpath/tests/fixtures/workspace/cargo-timing.html \
+         --metadata crates/cargo-critpath/tests/fixtures/workspace/cargo-metadata.json \
+         > crates/cargo-critpath/tests/golden/report.txt
+
+   and the same with `--format json --include-units` into `tests/golden/analysis.json`. The exact
+   commands are in the `REGENERATE` constants in `tests/report.rs` and `tests/json.rs`. The version
+   literal in `docs/json-schema.md`'s example needs the same treatment.
+4. Run `cargo build` so `Cargo.lock` is updated, and commit everything together.
+5. Tag it, annotated, with a message that says what changed and what is still unresolved.
+6. Repeat the gate, then `cargo publish --dry-run --workspace`, then `cargo publish --workspace`.
 
 Semantic versioning applies to the library API of `critpath-core` and to the command line and JSON
 schema of `cargo-critpath`. The JSON document carries its own `schema_version` independently — see
