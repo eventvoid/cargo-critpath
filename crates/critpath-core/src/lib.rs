@@ -12,10 +12,12 @@
 
 #![forbid(unsafe_code)]
 
+mod analysis;
 mod error;
 mod graph;
 mod millis;
 
+pub use analysis::{analyze, Analysis};
 pub use error::GraphError;
 pub use graph::{BuildGraph, Dep, EdgeKind, GraphBuilder, Unit, UnitId, UnitKind, MAX_UNITS};
 pub use millis::Millis;
