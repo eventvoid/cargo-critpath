@@ -889,3 +889,26 @@ fn a_unit_with_no_dependents_carries_slack_up_to_the_critical_path() {
     assert_eq!(analysis.latest_finish(ids[2]), Some(Millis::new(300)));
     assert_eq!(analysis.slack(ids[2]), Some(Millis::new(190)));
 }
+
+#[test]
+fn a_unit_is_never_told_to_finish_before_it_can() {
+    // A unit can always finish at its earliest possible time without delaying anything, so its
+    // latest finish is never earlier than its earliest finish. Two units whose weights sum past
+    // u64::MAX are where this last held: the critical path saturates, and a backward pass that
+    // subtracts from the saturated value hands the first unit a deadline before it can be met.
+    let half = 1u64 << 63;
+    let (graph, _) = build(
+        &[(half, None, false), (half, None, false)],
+        &[(0, 1, EdgeKind::Full)],
+    );
+
+    let analysis = analyze(&graph);
+    for (id, _) in graph.units() {
+        let earliest = analysis.earliest_finish(id).unwrap();
+        let latest = analysis.latest_finish(id).unwrap();
+        assert!(
+            latest >= earliest,
+            "unit {id} may finish at {earliest} at the earliest but is told to finish by {latest}"
+        );
+    }
+}
