@@ -181,9 +181,28 @@ acquire further tokens for parallel codegen. So `-j N` bounds the token pool, no
 concurrent compilations, and "N executors" is an upper bound on concurrency rather than a
 description of it.
 
-The direction of the resulting error is known and is stated wherever a prediction is: because real
-compilations can consume more than one token each, fewer units run at once than the model assumes,
-so **the model under-predicts wall time**, and it does so more as `codegen-units` rises.
+Two effects pull in opposite directions, and both were measured, so the honest statement is that
+the net direction is not known in general.
+
+*Against the model's optimism:* a `rustc` can consume more than one token, so fewer compilations
+run at once than `J` suggests, which makes a simulated makespan too short.
+
+*Against the model's pessimism:* observed concurrency can **exceed** `-j`. A clean `ripgrep` build
+at `-j 10` reported `Max concurrency: 12 (jobs=10 ncpu=10)`, and 7 of its 83 concurrency samples
+were above 10. Inspecting one of them, 11 units were active and 5 of those were build-script
+*executions*, which are not compiler processes and do not consume a compile token:
+
+    t=0.64  active=11  waiting=1
+      memchr (lib), regex-syntax (lib), encoding_rs (lib), aho-corasick (lib), grep-matcher (lib)
+      serde (build-script compile)
+      serde_json, serde_core, zmij, crossbeam-utils, libc  (build-script runs)
+
+Six compilations and five build-script runs. Capping the simulation at `J` therefore holds back
+work that Cargo would have run, which makes a simulated makespan too long.
+
+So `J` is neither a floor nor a ceiling on real concurrency. The tool reports the observed
+`Max concurrency` from the build alongside its own `J` so that the discrepancy is visible rather
+than assumed away.
 
 ## The model predicts the observed timeline
 
