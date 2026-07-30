@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/critpath-core"]
+members = ["crates/critpath-core", "crates/cargo-critpath"]
 resolver = "2"
 
 [workspace.package]
