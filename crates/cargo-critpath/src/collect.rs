@@ -170,5 +170,16 @@ pub fn read_text(path: &Path) -> io::Result<String> {
             ),
         ));
     }
-    String::from_utf8(bytes).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+    String::from_utf8(bytes).map_err(|error| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "{} is not UTF-8 text, which is what Cargo writes ({}); \
+                 capture it again with `cargo build --timings -v --offline 2>build.log`, \
+                 and check that nothing has rewritten or truncated the file since",
+                path.display(),
+                error.utf8_error()
+            ),
+        )
+    })
 }

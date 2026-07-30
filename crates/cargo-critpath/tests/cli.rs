@@ -243,3 +243,37 @@ fn a_log_in_utf16_is_rejected_as_input_whether_or_not_it_carries_a_mark() {
         );
     }
 }
+
+#[test]
+fn a_log_that_is_not_text_at_all_says_what_to_do_about_it() {
+    // Not UTF-16, just bytes that decode as nothing. The reader still needs to be told which file is
+    // at fault and what to do, not only which byte offset failed.
+    let mut bytes = b"   Compiling demo v0.1.0\n Running `/tc/bin/rustc --crate-name demo".to_vec();
+    bytes.extend_from_slice(&[0x80, 0xFE, 0x81]);
+    bytes.extend_from_slice(b"`\n");
+    let path = scratch_bytes("not-text.log", &bytes);
+
+    let run = run(&[
+        "critpath",
+        "--log",
+        &path,
+        "--timings",
+        &fixture("workspace/cargo-timing.html"),
+    ]);
+    assert_eq!(run.code(), 2, "the input is unusable, not the command line");
+    assert!(
+        run.err.contains("not-text.log"),
+        "the message must name the file: {}",
+        run.err
+    );
+    assert!(
+        run.err.contains("UTF-8"),
+        "and say what was expected: {}",
+        run.err
+    );
+    assert!(
+        run.err.contains("cargo build"),
+        "and how to capture it again: {}",
+        run.err
+    );
+}
