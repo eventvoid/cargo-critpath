@@ -212,7 +212,8 @@ fn i12_empty_graph_has_no_critical_path() {
 
     assert_eq!(analysis.critical_path_len(), Millis::ZERO);
     assert!(analysis.critical_path().is_empty());
-    // An identifier from another graph is not silently read as unit zero.
+    // An index past the end reads as absent rather than as unit zero. An identifier from another
+    // graph that happens to be in range is not detected; see the graph tests.
     assert_eq!(analysis.earliest_start(foreign), None);
     assert_eq!(analysis.earliest_finish(foreign), None);
     assert_eq!(analysis.latest_finish(foreign), None);

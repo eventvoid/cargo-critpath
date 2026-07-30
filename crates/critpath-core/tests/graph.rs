@@ -247,7 +247,7 @@ fn a_duplicate_edge_keeps_the_stronger_constraint_whichever_order_it_arrives() {
 }
 
 #[test]
-fn unit_lookup_outside_the_graph_returns_none_rather_than_panicking() {
+fn an_index_past_the_end_reads_as_absent_rather_than_panicking() {
     let mut b = GraphBuilder::new();
     b.add_unit(lib("a", 10, 5)).unwrap();
     let graph = b.build().unwrap();
@@ -319,4 +319,31 @@ fn assert_send_sync<T: Send + Sync>() {}
 fn graph_can_cross_thread_boundaries() {
     assert_send_sync::<BuildGraph>();
     assert_send_sync::<GraphError>();
+}
+
+#[test]
+fn an_identifier_from_another_graph_is_not_detected() {
+    // Identifiers are dense indices, so one from a different graph is only rejected when it happens
+    // to point past the end. Where both graphs are large enough it silently names a different unit.
+    // Nothing can detect that, so the documentation must not promise it does, and a caller must not
+    // mix identifiers between graphs.
+    let mut first = GraphBuilder::new();
+    first.add_unit(lib("a", 10, 5)).unwrap();
+    let second_of_first = first.add_unit(lib("b", 20, 5)).unwrap();
+    let one = first.build().unwrap();
+
+    let mut second = GraphBuilder::new();
+    second.add_unit(lib("x", 30, 5)).unwrap();
+    let second_of_second = second.add_unit(lib("y", 40, 5)).unwrap();
+    let two = second.build().unwrap();
+
+    assert_eq!(second_of_first, second_of_second, "both are index 1");
+    assert_eq!(
+        one.unit(second_of_second).map(|u| u.package.as_str()),
+        Some("b")
+    );
+    assert_eq!(
+        two.unit(second_of_first).map(|u| u.package.as_str()),
+        Some("y")
+    );
 }

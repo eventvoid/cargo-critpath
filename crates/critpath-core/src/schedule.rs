@@ -43,7 +43,7 @@ impl Default for Policy {
 
 /// When every unit ran, on a fixed number of executors under a fixed policy.
 ///
-/// Produced by [`simulate`]. Identifiers from a different graph read as `None`.
+/// Produced by [`simulate`]. An identifier from a different graph is not detected; see [`Analysis`].
 #[derive(Clone, Debug)]
 pub struct Schedule {
     start: Vec<Millis>,
@@ -63,13 +63,13 @@ impl Schedule {
         self.makespan
     }
 
-    /// When a unit started, or `None` for an identifier from another graph.
+    /// When a unit started, or `None` if the index is outside this schedule.
     #[must_use]
     pub fn start(&self, id: UnitId) -> Option<Millis> {
         self.start.get(id.index()).copied()
     }
 
-    /// When a unit finished, or `None` for an identifier from another graph.
+    /// When a unit finished, or `None` if the index is outside this schedule.
     ///
     /// Always its start plus its whole duration: a unit is never preempted or migrated.
     #[must_use]
@@ -275,13 +275,14 @@ pub fn area_bound(graph: &BuildGraph, executors: NonZeroU32) -> Millis {
 /// graph is the constraint and more executors cannot help. When the area bound does, the machine is
 /// the constraint and restructuring the graph will not buy much.
 ///
-/// `analysis` must be [`analyze`]'s result for `graph`; passing another graph's analysis compares
-/// two unrelated numbers and returns a meaningless one.
+/// Both terms come from the one analysis, so there is no pair of arguments that can disagree about
+/// which graph is being described.
 #[must_use]
-pub fn lower_bound(graph: &BuildGraph, analysis: &Analysis, executors: NonZeroU32) -> Millis {
-    analysis
-        .critical_path_len()
-        .max(area_bound(graph, executors))
+pub fn lower_bound(analysis: &Analysis, executors: NonZeroU32) -> Millis {
+    let area = analysis
+        .total_work()
+        .div_ceil_by(NonZeroU64::from(executors));
+    analysis.critical_path_len().max(area)
 }
 
 /// Units whose release time is known, ordered by that time and then by identifier.

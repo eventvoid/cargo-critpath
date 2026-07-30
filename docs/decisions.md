@@ -375,6 +375,27 @@ the minimum; the honest fix is to report rebuild fan-out as well, which the grap
 enough information to compute. That is the most valuable thing this tool does not yet do, and it is
 not in this release because it has not been validated.
 
+## D18 — No `Error` severity until something produces one
+
+**Decided.** `Severity` carries only `Warning`, and is `#[non_exhaustive]`.
+
+The machine-readable contract described severity as "warning or error" and said diagnostics sort
+errors first, so the obvious move was to add the variant and satisfy the document. The document was
+changed instead.
+
+Nothing produces an error-severity diagnostic. Input bad enough to stop the analysis is refused with
+a non-zero exit and a message, and no document is written at all — so a diagnostics array can only
+ever hold warnings. Adding a variant no code constructs is a promise about the future rather than a
+description of the present, which the standards for this repository rule out.
+
+The reversal is cheap. `#[non_exhaustive]` means a consumer must already tolerate a severity it does
+not know, so a later variant is not a breaking change. Both serialisation sites match `Severity`
+without a wildcard, so adding one is a compile error at exactly the two places that must handle it.
+
+**Rejected: adding `Error` before `Warning`** so that the derived ordering sorts it first. It would
+have made the document true without making the tool do anything, and the ordering rule it depends on
+now lives as a comment beside the sort that relies on it.
+
 ## D9 — MSRV 1.74.0
 
 **Decided.** `rust-version = "1.74.0"`, checked in CI on that exact toolchain.

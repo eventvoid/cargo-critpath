@@ -1083,7 +1083,7 @@ fn i6_no_schedule_finishes_before_the_work_can_be_done() {
                 "graph {index}: the reported area bound at {count} executors is not \
                  total work divided by the executor count"
             );
-            let lower = lower_bound(&graph, &analysis, executors(count));
+            let lower = lower_bound(&analysis, executors(count));
             assert_eq!(
                 lower,
                 bound.max(analysis.critical_path_len()),
@@ -1399,10 +1399,7 @@ fn i12_an_empty_graph_answers_zero_rather_than_failing() {
 
     for count in [1u32, 2, 7, u32::MAX] {
         assert_eq!(area_bound(&graph, executors(count)), Millis::ZERO);
-        assert_eq!(
-            lower_bound(&graph, &analysis, executors(count)),
-            Millis::ZERO
-        );
+        assert_eq!(lower_bound(&analysis, executors(count)), Millis::ZERO);
         for policy in POLICIES {
             assert_eq!(
                 simulate(&graph, executors(count), policy).makespan(),

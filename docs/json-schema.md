@@ -49,7 +49,7 @@ traced back to the build that produced it.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `cargo_version` | string | as reported by the timing report header |
+| `cargo_version` | string or null | always `null` today: the timing report's header carries `rustc`'s version but not Cargo's, and the tool does not run `cargo --version` to find out |
 | `rustc_version` | string | as reported by the timing report header |
 | `host` | string | host triple |
 | `target` | string | target triple |
@@ -196,7 +196,8 @@ it would make the tool's confident-sounding numbers less trustworthy, not more.
 
 ### `diagnostics`
 
-Machine-readable warnings and refusals. Empty array when there are none.
+Machine-readable warnings. Empty array when there are none. A refusal is not reported here: it is
+an exit code and a message on stderr, and no document is written.
 
 ```json
 { "severity": "warning", "code": "saving-below-noise-floor",
@@ -206,7 +207,10 @@ Machine-readable warnings and refusals. Empty array when there are none.
   "message": "only one timing report was supplied, so the run-to-run spread could not be measured and no saving can be checked against it" }
 ```
 
-`severity` is `warning` or `error`. `code` is a stable kebab-case identifier and is the field to
+`severity` is `warning`. It is the only value emitted today, because anything bad enough to stop the
+analysis is refused with a non-zero exit rather than reported as a diagnostic. Further severities may
+be added without bumping `schema_version`, so a consumer must tolerate one it does not know. `code`
+is a stable kebab-case identifier and is the field to
 match on; `message` is prose and may change in any release. Codes may be added without bumping
 `schema_version`.
 
@@ -230,6 +234,7 @@ Arrays are ordered deterministically, and the ordering is part of the contract:
 - `critical_path` from source to the attaining unit.
 - `scenarios` by descending `saving_ms.high`, then by `kind`, then by target label. Ranking is
   part of the output's meaning, so it is specified rather than incidental.
-- `diagnostics` by severity, errors first, then by `code`.
+- `diagnostics` by severity, most serious first, then by `code`. With only `warning` emitted today
+  this reduces to ordering by `code`.
 
 No array order depends on hash-map iteration.

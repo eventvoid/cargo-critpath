@@ -12,7 +12,12 @@ use crate::units::{self, MatchMethod};
 use crate::verbose::{Invocation, Role, VerboseLog};
 
 /// How serious a diagnostic is.
+///
+/// Only `Warning` is produced today: anything bad enough to stop the analysis is refused as a
+/// [`crate::ParseError`] instead. The type is open so that a severity can be added without a
+/// breaking release, and a caller must tolerate one it does not know.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum Severity {
     /// Something the reader should know, which did not stop the analysis.
     Warning,

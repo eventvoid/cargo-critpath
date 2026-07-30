@@ -62,9 +62,9 @@ impl fmt::Display for GraphError {
             ),
             Self::UnknownUnit { id, units } => write!(
                 f,
-                "unit {id} was named by an edge but never added to this graph, \
-                 which holds {units} units; \
-                 identifiers are only valid for the graph that produced them"
+                "unit {id} was named by an edge but this graph holds only {units} units; \
+                 an identifier is only meaningful for the graph that produced it, and one from \
+                 elsewhere is caught here only when it happens to point past the end"
             ),
             Self::SelfDependency { unit } => write!(
                 f,

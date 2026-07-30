@@ -14,9 +14,11 @@ pub const MAX_UNITS: usize = u32::MAX as usize - 1;
 
 /// A handle to a unit within one graph.
 ///
-/// Identifiers are only meaningful for the graph that produced them. Passing an identifier from one
-/// graph to another is reported as [`GraphError::UnknownUnit`] rather than silently reading the
-/// wrong unit.
+/// Identifiers are only meaningful for the graph that produced them, and mixing them is **not**
+/// detected once a graph is built: they are dense indices, so an identifier from another graph
+/// either points past the end or silently names a different unit. [`GraphBuilder::add_edge`] does
+/// reject an out-of-range identifier as [`GraphError::UnknownUnit`], but that is a bounds check
+/// rather than a provenance check.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnitId(u32);
 
@@ -222,7 +224,11 @@ impl BuildGraph {
         self.total_work
     }
 
-    /// The unit `id` refers to, or `None` if it belongs to another graph.
+    /// The unit `id` refers to, or `None` if the index is outside this graph.
+    ///
+    /// An identifier belonging to a different graph is not detected: identifiers are dense
+    /// indices, so a foreign one reads as `None` only when it points past the end, and otherwise
+    /// names a different unit. Do not mix identifiers between graphs.
     #[must_use]
     pub fn unit(&self, id: UnitId) -> Option<&Unit> {
         self.units.get(id.index())
@@ -236,13 +242,13 @@ impl BuildGraph {
             .map(|(i, u)| (UnitId(i as u32), u))
     }
 
-    /// The units `id` depends on, or `None` if it belongs to another graph.
+    /// The units `id` depends on, or `None` if the index is outside this graph.
     #[must_use]
     pub fn dependencies(&self, id: UnitId) -> Option<&[Dep]> {
         Self::slice(&self.deps, &self.dep_start, id)
     }
 
-    /// The units that depend on `id`, or `None` if it belongs to another graph.
+    /// The units that depend on `id`, or `None` if the index is outside this graph.
     #[must_use]
     pub fn dependents(&self, id: UnitId) -> Option<&[Dep]> {
         Self::slice(&self.rdeps, &self.rdep_start, id)
@@ -310,8 +316,9 @@ impl GraphBuilder {
     ///
     /// # Errors
     ///
-    /// [`GraphError::UnknownUnit`] if either identifier is not from this builder, and
-    /// [`GraphError::SelfDependency`] if they are the same unit.
+    /// [`GraphError::UnknownUnit`] if either index is outside this builder, which is a bounds check
+    /// and not a check of where the identifier came from, and [`GraphError::SelfDependency`] if they
+    /// are the same unit.
     pub fn add_edge(&mut self, from: UnitId, to: UnitId, kind: EdgeKind) -> Result<(), GraphError> {
         for id in [from, to] {
             if id.index() >= self.units.len() {

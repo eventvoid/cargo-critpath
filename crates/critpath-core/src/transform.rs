@@ -187,7 +187,9 @@ impl Applied {
         self.graph
     }
 
-    /// What became of `original`, or `None` if it is not a unit of the graph that was transformed.
+    /// What became of `original`, or `None` if the index is outside the graph that was transformed.
+    ///
+    /// An identifier from a different graph is not detected; see [`crate::BuildGraph`].
     #[must_use]
     pub fn mapped(&self, original: UnitId) -> Option<Mapped> {
         self.mapping
@@ -350,7 +352,7 @@ pub fn roots(graph: &BuildGraph) -> Vec<UnitId> {
 ///
 /// # Errors
 ///
-/// [`TransformError::UnknownUnit`] if the transformation names a unit of another graph,
+/// [`TransformError::UnknownUnit`] if the transformation names an index outside the graph,
 /// [`TransformError::UnsplittableKind`] and [`TransformError::FractionAboveOne`] if a split is
 /// impossible or asks for more than the whole unit, [`TransformError::MissingEdge`] if an edge
 /// removal names an edge that is not there, and [`TransformError::Rebuild`] if the produced graph
