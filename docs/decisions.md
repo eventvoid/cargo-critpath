@@ -259,18 +259,19 @@ measured figures below rather than inventing a threshold.
 
 **Why.** Three clean builds per project at `-j 10` gave these critical path lengths:
 
-    ripgrep         5800 / 5970 / 5570 ms      spread  400 ms   ( 6.9% of the median)
-    async-graphql  18160 / 16520 / 18030 ms    spread 1640 ms   ( 9.1%)
-    rust-analyzer  58580 / 58470 / 57260 ms    spread 1320 ms   ( 2.3%)
+    ripgrep          5800 /  5970 /  5570 ms    spread   400 ms   ( 6.9% of the median)
+    async-graphql   19800 / 18000 / 18030 ms    spread  1800 ms   (10.0%)
+    rust-analyzer   60150 / 59270 / 58840 ms    spread  1310 ms   ( 2.2%)
+    bevy           164540 / 147450 / 151510 ms  spread 17090 ms   (11.3%)
 
-And the top split recommendation for ripgrep was a saving of **300 ms** — comfortably *inside* its
-own 400 ms spread. Printed on its own, that number is indistinguishable from noise while looking
-like a finding. A tool that recommends work on the strength of a number smaller than its own
-measurement error is worse than no tool, which is the first non-negotiable in this project.
+Bevy's spread alone is 17 seconds. A saving smaller than that, printed on its own, is
+indistinguishable from noise while looking like a finding, and a tool that recommends work on the
+strength of a number smaller than its own measurement error is worse than no tool — the first
+non-negotiable in this project.
 
-Note also that the spread is not a fixed percentage: 2.3% on the largest project and 9.1% on the
-middle one. So a hard-coded percentage threshold would be wrong in both directions, which is why
-the spread is measured when it can be and declared unknown when it cannot.
+Note also that the spread is not a fixed percentage: 2.2% on the deepest project against 11.3% on
+the widest. So a hard-coded percentage threshold would be wrong in both directions, which is why the
+spread is measured when it can be and declared unknown when it cannot.
 
 **Rejected: a fixed percentage threshold.** The three measurements above span 2.3% to 9.1%. Any
 constant is wrong somewhere, and being wrong quietly is the failure mode that matters.
