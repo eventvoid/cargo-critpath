@@ -85,6 +85,28 @@ The rule applies to proc-macros and not to ordinary libraries. With `biga <- mid
 
 So `requires_full_closure` is a property of the consumer, and it reaches past its neighbours.
 
+**How much this rule is worth on real builds: nothing measured so far.** Recomputing the critical
+path with the closure requirement cleared on every unit changed it by exactly 0 ms on all four
+validation projects:
+
+    ripgrep         5800 ms -> 5800 ms
+    async-graphql  18160 ms -> 18160 ms
+    rust-analyzer  58580 ms -> 58580 ms
+    bevy          164540 ms -> 164540 ms
+
+The 30% figure above comes from a four-crate fixture built specifically to exhibit the effect. On
+real graphs a linking unit's direct dependencies are already `Full` edges, and the heavy units sit
+near the top of the DAG, so nothing buried deeper in the closure finishes later than the direct
+dependencies do.
+
+The rule is kept because it is what Cargo does, it was observed directly, and it can bind after a
+counterfactual transformation or on a `cargo test` graph where every test unit is a synchronisation
+point. But it is not what makes the model accurate, and it should not be read as though it were.
+
+By contrast, the refinement that does carry its weight is pipelining. Reclassifying every metadata
+edge as a full edge lengthens the critical path by 28.3% on ripgrep, 2.0% on async-graphql, 31.6%
+on rust-analyzer and 23.6% on bevy. Ignoring pipelining is the error that would matter.
+
 **It does not need a transitive closure to be materialised.** Define, over units in topological
 order,
 
