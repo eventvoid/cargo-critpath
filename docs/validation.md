@@ -199,6 +199,28 @@ The spread is not a fixed fraction of the build — 2.3% on rust-analyzer agains
 no constant threshold would be right. The tool measures the spread when given several timing reports
 and declines to guess when given one.
 
+## Result 8: how the analysis scales
+
+The quality bar this project set itself says a graph of several thousand units is analysed in
+seconds. Measured rather than asserted, with `cargo run --release --example scaling -p critpath-core`
+on the same machine, over synthetic graphs shaped like a real build (mostly libraries joined by
+metadata edges, one unit in seventeen a proc-macro that requires its full closure):
+
+    units     edges   construct     analyse    simulate
+     1000      3970     583.5us      86.8us      342.0us
+     5000     19970       4.9ms      332.8us       5.4ms
+    20000    119937      20.7ms        1.3ms      47.4ms
+    50000    299937      35.3ms        2.0ms     221.2ms
+
+The largest real project measured here, bevy, has 419 units. At 50 000 units — two orders of
+magnitude beyond that — the critical path takes 2 ms and a full simulation 221 ms.
+
+The two differ because they are not the same complexity. The analysis is a single pass in
+topological order and is linear. The simulation is not: the `cargo-like` priority counts each
+unit's transitive reverse-dependents, which is reachability counting, and the implementation
+propagates a 64-unit bitmask backwards for `O((V/64)(V + E))`. That is why simulate grows faster
+than analyse across the table, and it is the reason the claim is stated separately for each.
+
 ## What is not validated
 
 - **Release builds.** Every number here is dev profile, where the compiler frontend dominates each
