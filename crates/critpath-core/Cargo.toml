@@ -1,0 +1,16 @@
+[package]
+name = "critpath-core"
+description = "Schedule simulation and counterfactual analysis over a weighted build DAG, with no knowledge of any particular build system"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+readme = "README.md"
+
+[dependencies]
+
+[lints]
+workspace = true
