@@ -1245,8 +1245,128 @@ fn analysis_and_simulation_are_deterministic() {
     }
 }
 
-/// I8: an extra executor never lengthens the build.
+// --------------------------------------------------------------------------------------------
+// Monotonicity in the executor count
+// --------------------------------------------------------------------------------------------
+
+/// Invariant I8 of `docs/model.md` claims `makespan(J+1) <= makespan(J)`, on the grounds that the
+/// priority is a fixed total order that does not depend on `J`. That reasoning does not hold and
+/// the invariant is false. A fixed priority list is exactly the setting of Graham's scheduling
+/// anomaly: an extra executor lets a low-priority unit occupy the machine that a released,
+/// high-priority unit needed a moment later.
+///
+/// Six units and one edge are enough, and the schedule can be traced by hand. Unit 0 emits its
+/// metadata at 7 and unit 1 waits for it; every unit but unit 0 has priority 1, so ties go to the
+/// lower identifier.
+///
+/// On two executors:
+///
+/// ```text
+///     A  unit 0  0..8       B  unit 2  0..1
+///                           B  unit 3  1..7
+///                           B  unit 1  7..17   <- released at 7, and an executor was free
+///     A  unit 4  8..15
+///     A  unit 5  15..17                        makespan 17, which is the critical path
+/// ```
+///
+/// On three executors:
+///
+/// ```text
+///     A  unit 0  0..8   B  unit 2  0..1   C  unit 3  0..6
+///                       B  unit 4  1..8   C  unit 5  6..8
+///                       A  unit 1  8..18                   <- released at 7, nothing free
+/// ```
+///
+/// The third executor pulls unit 4 forward from 8 to 1, which leaves nothing free at 7, and the
+/// build finishes a millisecond later than it does on two executors. Nothing here contradicts
+/// section 5: the simulator is doing precisely what a non-preemptive list scheduler does. It is I8
+/// that overstates what a list scheduler guarantees, and section 7 already accepts the same
+/// anomaly for edge removal.
+///
+/// The numbers below are the observed behaviour, pinned so that a change to the scheduler has to
+/// be noticed. Which of the two — the invariant or the scheduler — gives way is a decision about
+/// the model rather than about this test.
 #[test]
+fn an_extra_executor_can_lengthen_the_simulated_build() {
+    let spec = Spec {
+        units: vec![
+            (8, Some(7), false),
+            (10, None, false),
+            (1, None, false),
+            (6, None, false),
+            (7, None, false),
+            (2, None, false),
+        ],
+        edges: vec![(0, 1, EdgeKind::Metadata)],
+    };
+    let graph = build(&spec);
+    let ids = ids_of(&graph);
+
+    let two = simulate(&graph, nz(2), Policy::CargoLike);
+    let three = simulate(&graph, nz(3), Policy::CargoLike);
+
+    let starts = |schedule: &Schedule| -> Vec<u64> {
+        ids.iter()
+            .map(|&id| schedule.start(id).unwrap().get())
+            .collect()
+    };
+    assert_eq!(starts(&two), vec![0, 7, 0, 1, 8, 15]);
+    assert_eq!(starts(&three), vec![0, 8, 0, 0, 1, 6]);
+
+    assert_eq!(two.makespan(), Millis::new(17));
+    assert_eq!(three.makespan(), Millis::new(18));
+
+    // Two executors already reach the critical path, so a third can only make things worse.
+    assert_eq!(analyze(&graph).critical_path_len(), Millis::new(17));
+    assert_eq!(reference(&graph).critical_path_len, 17);
+
+    // Both schedules are otherwise sound, and the loss is in the ordering rather than in the
+    // graph: seventeen milliseconds is achievable on three executors as well.
+    replay(&graph, &two, 2, "two executors");
+    replay(&graph, &three, 3, "three executors");
+    assert_eq!(Exhaustive::optimal_makespan(&graph, 2), 17);
+    assert_eq!(Exhaustive::optimal_makespan(&graph, 3), 17);
+}
+
+/// The anomaly is not an artefact of Cargo's cost-blind ordering: the critical-path heuristic has
+/// it too, on a graph of the same size. Three independent two-unit chains, and the third executor
+/// again starts work that is not on the longest path.
+#[test]
+fn the_longest_path_policy_has_the_anomaly_too() {
+    let spec = Spec {
+        units: vec![
+            (5, None, false),
+            (10, Some(9), false),
+            (4, None, false),
+            (5, None, false),
+            (12, None, false),
+            (6, None, false),
+        ],
+        edges: vec![
+            (0, 3, EdgeKind::Full),
+            (1, 4, EdgeKind::Metadata),
+            (2, 5, EdgeKind::Full),
+        ],
+    };
+    let graph = build(&spec);
+
+    let two = simulate(&graph, nz(2), Policy::LongestPath);
+    let three = simulate(&graph, nz(3), Policy::LongestPath);
+    assert_eq!(two.makespan(), Millis::new(21));
+    assert_eq!(three.makespan(), Millis::new(22));
+
+    replay(&graph, &two, 2, "two executors");
+    replay(&graph, &three, 3, "three executors");
+}
+
+/// How often the anomaly bites, across the whole corpus.
+///
+/// This is the general form of I8, and it fails; the two tests above hold its minimal
+/// counterexamples. It is left runnable rather than deleted so that the extent of the
+/// disagreement can be measured after any change to the scheduler:
+/// `cargo test -p critpath-core --test oracle -- --ignored`.
+#[test]
+#[ignore = "I8 as written is false; see an_extra_executor_can_lengthen_the_simulated_build"]
 fn makespan_does_not_grow_with_more_executors() {
     let cases = corpus(&wide_shapes(), 45, 0x5eed_0008);
     let mut violations = Vec::new();
