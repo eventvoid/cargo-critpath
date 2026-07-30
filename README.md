@@ -7,10 +7,26 @@ change, and it does not say what changing it would buy.
 This tool answers that. It reads a build's dependency graph and its per-unit compile times, simulates
 the schedule, finds the critical path, and estimates what a specific change to the graph would save.
 
-The most useful thing it tells you is negative. Sorting crates by how long they take — which
-`cargo build --timings` already gives you for free — cannot distinguish a crate that holds the build
-back from one that compiles in parallel with something longer and could be made instant for no gain.
-On ripgrep, five of the ten longest-compiling units contribute nothing to the critical path at all.
+The most useful thing it tells you is negative. Sorting units by how long they take — which
+`cargo build --timings` already gives you for free — cannot distinguish one that holds the build back
+from one that compiles alongside something longer and could be made instant for no gain. On ripgrep,
+**seven of the ten longest-compiling units contribute nothing to the critical path**, and six of the
+ten are build-script executions rather than compilations:
+
+    2260ms  slack      0  on the path   regex-automata (lib)
+    2220ms  slack    300                crossbeam-epoch (build script, run)
+    2080ms  slack      0  on the path   regex-syntax (lib)
+    2020ms  slack   1040                serde (build script, run)
+    1740ms  slack    820                libc (build script, run)
+    1720ms  slack   2080                anyhow (build script, run)
+    1660ms  slack      0  on the path   ripgrep (rg)
+    1590ms  slack   2300                ripgrep (build script, run)
+    1410ms  slack   2460                encoding_rs (lib)
+    1400ms  slack    910                crossbeam-utils (build script, run)
+
+Slack is how much later a unit could finish without moving the critical path, so the second-longest
+unit in this build has 300 ms of room and the fourth has a full second. Shortening any of the seven
+saves nothing until its slack is used up.
 
 Measured on four real projects from 54 to 419 units, all four were limited by the shape of their
 dependency graph rather than by available cores. On bevy the critical path is 99.5% of the entire
