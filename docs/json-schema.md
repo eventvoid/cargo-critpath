@@ -196,7 +196,8 @@ it would make the tool's confident-sounding numbers less trustworthy, not more.
 
 ### `diagnostics`
 
-Machine-readable warnings and refusals. Empty array when there are none.
+Machine-readable warnings. Empty array when there are none. A refusal is not reported here: it is
+an exit code and a message on stderr, and no document is written.
 
 ```json
 { "severity": "warning", "code": "saving-below-noise-floor",

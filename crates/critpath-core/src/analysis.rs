@@ -120,8 +120,8 @@ impl Analysis {
         self.latest_finish.get(id.index()).copied()
     }
 
-    /// How much later than its earliest finish a unit may finish, or `None` for an identifier from
-    /// another graph.
+    /// How much later than its earliest finish a unit may finish, or `None` if the index is outside
+    /// this analysis.
     ///
     /// Zero exactly for the units that cannot move at all (I9). Note that this is room in the
     /// *finish* time: lengthening a pipelined producer by its slack is safe, but so is lengthening
@@ -149,8 +149,8 @@ impl Analysis {
     /// path sum to exactly [`critical_path_len`](Self::critical_path_len), which makes them the
     /// right quantity to rank candidates for change by.
     ///
-    /// `None` for a unit that is not on the reported path, and for an identifier from another
-    /// graph. A unit off the path adds nothing to it, but that does not mean the build would not
+    /// `None` for a unit that is not on the reported path, and for an index outside this analysis.
+    /// A unit off the path adds nothing to it, but that does not mean the build would not
     /// notice its absence: check [`is_critical`](Self::is_critical) for units on an equally long
     /// path elsewhere.
     #[must_use]

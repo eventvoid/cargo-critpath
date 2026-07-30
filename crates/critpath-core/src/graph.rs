@@ -316,8 +316,9 @@ impl GraphBuilder {
     ///
     /// # Errors
     ///
-    /// [`GraphError::UnknownUnit`] if either identifier is not from this builder, and
-    /// [`GraphError::SelfDependency`] if they are the same unit.
+    /// [`GraphError::UnknownUnit`] if either index is outside this builder, which is a bounds check
+    /// and not a check of where the identifier came from, and [`GraphError::SelfDependency`] if they
+    /// are the same unit.
     pub fn add_edge(&mut self, from: UnitId, to: UnitId, kind: EdgeKind) -> Result<(), GraphError> {
         for id in [from, to] {
             if id.index() >= self.units.len() {

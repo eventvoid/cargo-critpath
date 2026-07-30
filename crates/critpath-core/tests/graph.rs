@@ -247,7 +247,7 @@ fn a_duplicate_edge_keeps_the_stronger_constraint_whichever_order_it_arrives() {
 }
 
 #[test]
-fn unit_lookup_outside_the_graph_returns_none_rather_than_panicking() {
+fn an_index_past_the_end_reads_as_absent_rather_than_panicking() {
     let mut b = GraphBuilder::new();
     b.add_unit(lib("a", 10, 5)).unwrap();
     let graph = b.build().unwrap();
