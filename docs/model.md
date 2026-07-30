@@ -245,9 +245,9 @@ to a capacity violation.
 **I7 — Unlimited executors reach the critical path.** For `J >= unit count`,
 `makespan(J) == CP` exactly.
 
-**I8 — Monotonicity in J does NOT hold.** See the anomalies section below. The number is kept so
-that the other invariants need not be renumbered, and so that the retraction is visible rather than
-silently absent.
+**I8 — Monotonicity in J does NOT hold.** `makespan(J+1) <= makespan(J)` is false; see the anomalies
+section below. The number is retained rather than reused so that the other invariants keep the
+numbers the tests cite.
 
 **I9 — Slack non-negative, zero on the critical path.** With `lft(U)` the latest finish that
 does not increase `CP`, `slack(U) = lft(U) - eft(U) >= 0`, and `slack(U) = 0` for every `U` on a
@@ -290,9 +290,10 @@ bounded-executor simulation is affected.
 
 **Removing an edge can increase `makespan(J)`.**
 
-**Adding an executor can increase `makespan(J)`.** An earlier version of this document asserted the
-opposite as invariant I8, reasoning that it held because the priority is a fixed total order that
-does not depend on `J`. That reasoning is wrong. A counterexample is in the test suite as
+**Adding an executor can increase `makespan(J)`.** It is tempting to argue otherwise from the
+priority being a fixed total order that does not depend on `J`. That argument does not hold: a fixed
+priority list is the setting of the anomaly, not a defence against it. A counterexample is in the
+test suite as
 `more_executors_can_lengthen_a_schedule`: seven units that finish in 7 ms on two executors and 8 ms
 on three. The extra executor lets low-priority work start earlier, and it is still occupying a
 machine at the instant the critical unit becomes ready.
@@ -460,6 +461,5 @@ error given.
 - A simulation is not. A list scheduler needs a priority queue, and the `cargo-like` priority is a
   count of transitive reverse-dependents — reachability counting, for which no linear-time algorithm
   on a general DAG is known. The implementation propagates a 64-unit membership mask backwards,
-  giving `O((V/64)(V + E))` time in `O(V)` memory. An earlier version of this document claimed
-  `O(V + E)` for a simulation; that was not achievable and the claim was wrong rather than merely
-  unmet.
+  giving `O((V/64)(V + E))` time in `O(V)` memory. `O(V + E)` for a simulation is not achievable and
+  is not claimed.
