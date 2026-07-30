@@ -78,6 +78,34 @@ The fields are sound but half empty. A dependency of two crates reports nothing 
 other dependency happened to finish later in both cases. **The dependency graph cannot be
 reconstructed from the timing report**, and a second input is required.
 
+### The report's shape is not stable across Cargo versions
+
+Three things changed within recent releases, so the parser identifies what it found and refuses
+clearly rather than guessing:
+
+- **Fresh units** were absent from `UNIT_DATA` in Cargo 1.94 and earlier, present with
+  `duration: 0.0` in the 1.95 series, and filtered out again in later development. Both shapes
+  have to be handled, and the header's fresh and dirty counts are the reliable signal either way.
+- **The unit index `i`** corresponds to the `--unit-graph` index on Cargo 1.95 and later, because
+  both are derived from the same sorted unit list. On older releases `i` was a report-local
+  start-order index and the correspondence does not hold. Units are therefore matched by identity,
+  and the index is used only as a corroborating check.
+- **`--timings` is explicitly disclaimed upstream as not machine-readable.** Cargo's own build
+  analysis work treats HTML scraping as a stopgap.
+
+Nightly Cargo now carries `-Z build-analysis`, with `cargo report timings`, `cargo report sessions`
+and `cargo report rebuilds`. It records a real edge set and per-unit freshness with rebuild
+reasons, and is strictly better data than the HTML. It is nightly-only, so it is not the primary
+input, but it is the obvious thing to adopt when it stabilises.
+
+### The report cannot tell a library from a proc-macro
+
+`UNIT_DATA`'s `target` field renders every library target as `""`. A plain rlib, a proc-macro, a
+`cdylib` and a `dylib` are all indistinguishable in the timing report. Since a proc-macro consumer
+needs full object code and an rlib consumer does not, this distinction decides the edge kind for
+every edge in the graph — so it has to come from somewhere else. That is the second reason,
+alongside the incomplete `unblocked_*` fields, that the verbose build log is the structural input.
+
 ### Fresh units poison the report
 
 Rebuilding after touching one file:
@@ -130,6 +158,32 @@ than by name, and no part of Cargo's unit-construction logic has to be guessed a
 
 `-v` prints `rustc` lines only for dirty units, which composes with the fresh-unit problem above:
 a full, clean build is required either way.
+
+## Cargo's scheduler, and what it means for prediction
+
+Read from Cargo's source, at commit `0d83fa6`:
+
+- Every unit is queued with a **hard-coded cost of 100**. Cargo's scheduler has no idea how long
+  anything takes.
+- A unit's priority is its own cost plus the cost of all of its transitive reverse-dependencies,
+  which reduces to `1 + (number of transitive reverse-dependents)`.
+- Having found the highest priority, Cargo breaks ties by **hash-map iteration order**.
+
+The last point puts a floor on how accurately any simulator can predict a single build: two runs
+of the same build can legitimately schedule differently. It is also why the simulator offers a
+`cargo-like` policy rather than only a smarter one — reproducing a cost-blind scheduler is the only
+way to estimate Cargo's wall time instead of the wall time of a better build system.
+
+## `-j` is not a count of compiler processes
+
+Cargo runs a jobserver. A `rustc` process holds one implicit token for its lifetime and can
+acquire further tokens for parallel codegen. So `-j N` bounds the token pool, not the number of
+concurrent compilations, and "N executors" is an upper bound on concurrency rather than a
+description of it.
+
+The direction of the resulting error is known and is stated wherever a prediction is: because real
+compilations can consume more than one token each, fewer units run at once than the model assumes,
+so **the model under-predicts wall time**, and it does so more as `codegen-units` rises.
 
 ## The model predicts the observed timeline
 
