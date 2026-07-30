@@ -165,3 +165,87 @@ fn units_that_cannot_be_told_apart_are_paired_by_order_and_said_to_be() {
         ordered[0].message
     );
 }
+
+/// One consumer naming two versions of the same package.
+///
+/// Cargo renames the second, so the two `--extern` arguments differ in name but agree on package.
+/// Edges resolve by the artifact hash in the path rather than by that name, and this is the shape
+/// that tells the two apart: a name-keyed resolver finds no producer called `thiserror_2` and
+/// silently drops the edge, leaving a graph that understates the critical path.
+#[test]
+fn a_consumer_naming_two_versions_gets_an_edge_to_each() {
+    let log = "\
+     Running `/tc/bin/rustc --crate-name thiserror /reg/thiserror-1.0.69/src/lib.rs \
+     --crate-type lib --emit=dep-info,metadata,link -C extra-filename=-1111111111111111 \
+     --out-dir /ws/target/debug/deps`\n\
+     Running `/tc/bin/rustc --crate-name thiserror /reg/thiserror-2.0.18/src/lib.rs \
+     --crate-type lib --emit=dep-info,metadata,link -C extra-filename=-2222222222222222 \
+     --out-dir /ws/target/debug/deps`\n\
+     Running `/tc/bin/rustc --crate-name app /reg/app-0.1.0/src/lib.rs \
+     --crate-type lib --emit=dep-info,metadata,link -C extra-filename=-3333333333333333 \
+     --out-dir /ws/target/debug/deps \
+     --extern thiserror=/ws/target/debug/deps/libthiserror-1111111111111111.rmeta \
+     --extern thiserror_2=/ws/target/debug/deps/libthiserror-2222222222222222.rmeta`\n";
+
+    let entries = [
+        // Start times consistent with the graph: `app` waits for the later of the two metadata
+        // moments, 0.6, so two units are live at t=0 and the header's peak of 2 is right.
+        ("thiserror", "1.0.69", 0usize, 0.0_f64, 0.4_f64, 0.3_f64),
+        ("thiserror", "2.0.18", 1, 0.0, 0.9, 0.6),
+        ("app", "0.1.0", 2, 0.6, 0.1, 0.05),
+    ]
+    .iter()
+    .map(|(name, version, i, start, duration, frontend)| {
+        format!(
+            "{{\"i\":{i},\"name\":\"{name}\",\"version\":\"{version}\",\"mode\":\"todo\",\
+             \"target\":\"\",\"features\":[],\"start\":{start},\"duration\":{duration},\
+             \"unblocked_units\":[],\"unblocked_rmeta_units\":[],\
+             \"sections\":[[\"frontend\",{{\"start\":0.0,\"end\":{frontend}}}],\
+             [\"codegen\",{{\"start\":{frontend},\"end\":{duration}}}]]}}"
+        )
+    })
+    .collect::<Vec<String>>()
+    .join(",\n");
+
+    let timing = format!(
+        "<html><body>\n<table class=\"summary-table\">\n\
+         <tr>\n<td>Targets:</td><td>app 0.1.0 (lib)</td>\n</tr>\n\
+         <tr>\n<td>Profile:</td><td>dev</td>\n</tr>\n\
+         <tr>\n<td>Fresh units:</td><td>0</td>\n</tr>\n\
+         <tr>\n<td>Dirty units:</td><td>3</td>\n</tr>\n\
+         <tr>\n<td>Total units:</td><td>3</td>\n</tr>\n\
+         <tr>\n<td>Max concurrency:</td><td>2 (jobs=4 ncpu=8)</td>\n</tr>\n\
+         <tr>\n<td>Total time:</td><td>1.0s</td>\n</tr>\n\
+         <tr>\n<td>rustc:</td><td>rustc 1.95.0 (59807616e 2026-04-14)<br>\
+         Host: aarch64-apple-darwin<br>Target: aarch64-apple-darwin</td>\n</tr>\n\
+         </table>\n<script>\nDURATION = 2;\nconst UNIT_DATA = [\n{entries}\n];\n\
+         const CONCURRENCY_DATA = [\n{{\"t\":0.1,\"active\":2,\"waiting\":0,\"inactive\":1}}\n];\n\
+         const CPU_USAGE = [\n[0.0,50.0]\n];\n</script></body></html>\n"
+    );
+
+    let input = cargo_critpath::parse(log, &timing).unwrap();
+    let graph = &input.graph;
+    let app = graph
+        .units()
+        .find(|(_, unit)| unit.package == "app")
+        .map(|(id, _)| id)
+        .unwrap();
+
+    let dependencies = graph.dependencies(app).unwrap();
+    assert_eq!(
+        dependencies.len(),
+        2,
+        "both versions are named, so both are dependencies"
+    );
+    let mut totals: Vec<u64> = dependencies
+        .iter()
+        .map(|dep| graph.unit(dep.unit).unwrap().total.get())
+        .collect();
+    totals.sort_unstable();
+    // 400ms and 900ms: two distinct units, so neither edge collapsed onto the other version.
+    assert_eq!(totals, vec![400, 900]);
+    for dep in dependencies {
+        assert_eq!(dep.kind, EdgeKind::Metadata);
+    }
+    assert!(input.diagnostics.is_empty(), "{:?}", input.diagnostics);
+}
