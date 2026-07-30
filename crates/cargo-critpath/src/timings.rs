@@ -163,6 +163,7 @@ impl TimingReport {
 /// incomplete, [`ParseError::BadUnitField`] if an entry has a shape this parser does not know, and
 /// [`ParseError::FreshUnits`] if the build reused cached units, whose recorded durations are zero.
 pub fn parse(text: &str) -> Result<TimingReport, ParseError> {
+    crate::error::reject_wide_text(text, "timing report")?;
     // The unit array is located first, so that a file which is not a timing report at all is named
     // as such rather than as a file with a missing table row.
     let raw = array_literal(text, "UNIT_DATA")?.ok_or(ParseError::NoUnitData)?;

@@ -5,7 +5,12 @@
 //! paths replaced by a placeholder root.
 
 // A test asserting a parse result is allowed to unwrap: a panic is the failure report.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic
+)]
 
 use cargo_critpath::{ParseError, Role};
 use critpath_core::{EdgeKind, UnitKind};
@@ -422,5 +427,35 @@ fn unc_and_extended_length_windows_paths_are_read() {
     assert_eq!(
         parsed.invocations[1].run_artifact.as_deref(),
         Some("-2222222222222222")
+    );
+}
+
+/// A log redirected by PowerShell, which writes UTF-16 rather than UTF-8.
+///
+/// `cargo build -v 2>build.log` under PowerShell 5.1 produces UTF-16LE. Without a byte-order mark
+/// every second byte is a NUL, which is valid UTF-8, so the text decodes and then matches nothing.
+/// Reporting that as a log without compiler invocations sends the reader to re-run a build that was
+/// in fact fine.
+#[test]
+fn a_utf16_log_is_named_as_such_rather_than_called_empty() {
+    let ascii = "   Compiling demo v0.1.0\n\
+         Running `/tc/bin/rustc --crate-name demo --crate-type bin --emit=dep-info,link \
+         -C metadata=eeee0000eeee0000 -C extra-filename=-5555555555555555 \
+         --out-dir /ws/target/debug/deps src/main.rs`\n";
+    // UTF-16LE without a byte-order mark: every character followed by a NUL.
+    let utf16: String = ascii.chars().flat_map(|c| [c, '\0']).collect();
+
+    match cargo_critpath::parse_verbose_log(&utf16) {
+        Err(ParseError::NotUtf8 { .. }) => {}
+        other => panic!("expected NotUtf8, got {other:?}"),
+    }
+
+    // And the same text as UTF-8 parses, so the fixture is not merely unparseable.
+    assert_eq!(
+        cargo_critpath::parse_verbose_log(ascii)
+            .unwrap()
+            .invocations
+            .len(),
+        1
     );
 }

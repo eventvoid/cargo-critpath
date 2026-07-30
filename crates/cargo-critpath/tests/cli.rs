@@ -13,7 +13,7 @@
 
 mod common;
 
-use common::{fixture, run, run_workspace, scratch_file};
+use common::{fixture, run, run_workspace, scratch_bytes, scratch_file};
 
 /// A timing report in the target alphabet `cargo check` produces, recorded in
 /// `docs/cargo-data-sources.md`: a library renders as `" (check)"` and a binary as
@@ -211,4 +211,35 @@ fn a_threshold_that_is_not_a_number_is_a_usage_error() {
     let run = run_workspace(&["--fail-if-critical-path-over", "soon"]);
     assert_eq!(run.code(), 1);
     assert!(run.err.contains("soon"), "{}", run.err);
+}
+
+#[test]
+fn a_log_in_utf16_is_rejected_as_input_whether_or_not_it_carries_a_mark() {
+    // PowerShell's redirection writes UTF-16. With a byte-order mark the file is not valid UTF-8 at
+    // all; without one every second byte is a NUL, which is. Both are the same mistake and both
+    // have to be reported as input this tool cannot use, not as a bad command line: a script that
+    // branches on the exit code must not see the difference.
+    let utf16: Vec<u8> = "   Compiling demo v0.1.0\n Running `/tc/bin/rustc --crate-name demo`\n"
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect();
+    let mut with_mark = vec![0xFF, 0xFE];
+    with_mark.extend_from_slice(&utf16);
+
+    for (name, bytes) in [("utf16-bom.log", &with_mark), ("utf16-plain.log", &utf16)] {
+        let path = scratch_bytes(name, bytes);
+        let run = run(&[
+            "critpath",
+            "--log",
+            &path,
+            "--timings",
+            &fixture("workspace/cargo-timing.html"),
+        ]);
+        assert_eq!(run.code(), 2, "{name}: expected input to be rejected");
+        assert!(
+            run.err.contains("UTF-16"),
+            "{name}: the message must name the encoding, got: {}",
+            run.err
+        );
+    }
 }

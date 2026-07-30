@@ -39,9 +39,9 @@ pub const METADATA_NAME: &str = "cargo-metadata.json";
 pub fn from_directory(directory: &Path) -> io::Result<BuildOutputs> {
     let metadata_path = directory.join(METADATA_NAME);
     Ok(BuildOutputs {
-        verbose_log: fs::read_to_string(directory.join(VERBOSE_LOG_NAME))?,
-        timing_html: fs::read_to_string(directory.join(TIMING_REPORT_NAME))?,
-        cargo_metadata: fs::read_to_string(metadata_path).ok(),
+        verbose_log: read_text(&directory.join(VERBOSE_LOG_NAME))?,
+        timing_html: read_text(&directory.join(TIMING_REPORT_NAME))?,
+        cargo_metadata: read_text(&metadata_path).ok(),
     })
 }
 
@@ -57,10 +57,10 @@ pub fn from_paths(
     cargo_metadata: Option<&Path>,
 ) -> io::Result<BuildOutputs> {
     Ok(BuildOutputs {
-        verbose_log: fs::read_to_string(verbose_log)?,
-        timing_html: fs::read_to_string(timing_report)?,
+        verbose_log: read_text(verbose_log)?,
+        timing_html: read_text(timing_report)?,
         cargo_metadata: match cargo_metadata {
-            Some(path) => Some(fs::read_to_string(path)?),
+            Some(path) => Some(read_text(path)?),
             None => None,
         },
     })
@@ -143,4 +143,32 @@ pub fn run_cargo_metadata(manifest_path: &Path) -> io::Result<String> {
     }
     String::from_utf8(output.stdout)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
+}
+
+/// Reads a file as UTF-8 text, naming the encoding when it is not.
+///
+/// # Errors
+///
+/// Any [`io::Error`] from reading the file, and [`io::ErrorKind::InvalidData`] when the contents are
+/// not UTF-8.
+///
+/// A byte-order mark means the file is UTF-16, which is what a redirection under PowerShell writes.
+/// `read_to_string` would reject it as invalid UTF-8 and leave the reader checking the path and the
+/// build, neither of which is the problem.
+pub fn read_text(path: &Path) -> io::Result<String> {
+    let bytes = fs::read(path)?;
+    let wide = matches!(bytes.get(..2), Some([0xFF, 0xFE] | [0xFE, 0xFF]));
+    if wide {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "{} begins with a UTF-16 byte-order mark, but Cargo writes UTF-8; \
+                 a redirection under PowerShell writes UTF-16. Capture it with \
+                 `cargo build --timings -v --offline 2>&1 | Out-File -Encoding utf8 build.log`, \
+                 or from a shell that redirects as UTF-8",
+                path.display()
+            ),
+        ));
+    }
+    String::from_utf8(bytes).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
 }
