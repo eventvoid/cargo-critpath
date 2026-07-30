@@ -222,6 +222,10 @@ cannot increase `CP`, because `metadata_at <= total`.
 
 **I14 — Weight monotonicity.** Increasing any `total(U)` cannot decrease `CP`.
 
+**I15 — Chain and fan closed forms.** For a chain of `n` units of weight `w` joined by `Full`
+edges, `CP = n*w`. For one source fanning out to `n` sinks, `CP = w_source + max w_sink`. The
+tests compute these by hand rather than by calling the code under test.
+
 **I16 — A closure requirement can only delay.** Setting `requires_full_closure` on any unit
 cannot decrease `CP`, and clearing it on any unit cannot increase `CP`.
 
@@ -233,10 +237,6 @@ not merely for its direct dependencies.
 recurrence of section 3.1 equals `max over D in transitiveDeps(U) of eft(D)`, computed by
 explicit enumeration. This is a differential test against a deliberately naive implementation,
 because the recurrence is the part of the model most likely to be subtly wrong.
-
-**I15 — Chain and fan closed forms.** For a chain of `n` units of weight `w` joined by `Full`
-edges, `CP = n*w`. For one source fanning out to `n` sinks, `CP = w_source + max w_sink`. The
-tests compute these by hand rather than by calling the code under test.
 
 ### An anomaly that is deliberately not an invariant
 
