@@ -263,12 +263,13 @@ fn optimistic_split_gives_each_dependent_exactly_one_part() {
     let split = applied.graph();
     let (first, second) = split_halves(&applied, target);
 
-    // Dependents in ascending identifier order are d0, d1, d2, d3. They alternate starting with
-    // the first part, so d0 and d2 take part a and d1 and d3 take part b.
-    assert_eq!(producers(split, kept(&applied, d0)), vec![first]);
-    assert_eq!(producers(split, kept(&applied, d1)), vec![second]);
-    assert_eq!(producers(split, kept(&applied, d2)), vec![first]);
-    assert_eq!(producers(split, kept(&applied, d3)), vec![second]);
+    // Every dependent attaches to the part that becomes available first. The two parts are equal
+    // here, and a tie goes to part a.
+    for dependent in [d0, d1, d2, d3] {
+        assert_eq!(producers(split, kept(&applied, dependent)), vec![first]);
+    }
+    // Nothing at all depends on the part that was not chosen.
+    assert!(split.dependents(second).unwrap().is_empty());
 
     // Four dependents, one incoming edge each, and no incoming edges anywhere else.
     assert_eq!(split.edge_count(), 4);
@@ -282,6 +283,52 @@ fn optimistic_split_gives_each_dependent_exactly_one_part() {
     // 800 * 1/2 = 400, remainder 800 - 400 = 400, no overhead.
     assert_eq!(split.unit(first).unwrap().total, Millis::new(400));
     assert_eq!(split.unit(second).unwrap().total, Millis::new(400));
+}
+
+#[test]
+fn an_optimistic_split_attaches_every_dependent_to_the_part_that_finishes_first() {
+    let mut b = GraphBuilder::new();
+    let target = b.add_unit(lib("target", 800, 400)).unwrap();
+    let d0 = b.add_unit(lib("d0", 10, 5)).unwrap();
+    let d1 = b.add_unit(lib("d1", 10, 5)).unwrap();
+    b.add_edge(target, d0, EdgeKind::Metadata).unwrap();
+    b.add_edge(target, d1, EdgeKind::Full).unwrap();
+    let graph = b.build().unwrap();
+
+    let applied = apply(
+        &graph,
+        &Transform::SplitUnit {
+            unit: target,
+            numerator: 3,
+            denominator: nz(4),
+            dependents: SplitDependents::Optimistic,
+            overhead: Millis::ZERO,
+        },
+    )
+    .unwrap();
+    let split = applied.graph();
+    let (first, second) = split_halves(&applied, target);
+
+    // Work: 800 * 3/4 = 600, remainder 800 - 600 = 200. Here it is the second part that is the
+    // smaller one, so it is the second part that everything attaches to. Both parts inherit the
+    // same incoming edges, so the smaller part is available first whatever an edge asks for, and
+    // the same part is chosen for the metadata edge and the full edge alike.
+    assert_eq!(split.unit(first).unwrap().total, Millis::new(600));
+    assert_eq!(split.unit(second).unwrap().total, Millis::new(200));
+    // Metadata: 400 * 3/4 = 300 and 400 * 1/4 = 100.
+    assert_eq!(
+        split.unit(first).unwrap().metadata_at,
+        Some(Millis::new(300))
+    );
+    assert_eq!(
+        split.unit(second).unwrap().metadata_at,
+        Some(Millis::new(100))
+    );
+
+    assert_eq!(producers(split, kept(&applied, d0)), vec![second]);
+    assert_eq!(producers(split, kept(&applied, d1)), vec![second]);
+    assert!(split.dependents(first).unwrap().is_empty());
+    assert_eq!(split.edge_count(), 2);
 }
 
 #[test]
@@ -786,8 +833,8 @@ fn an_optimistic_split_leaves_the_edges_it_does_not_touch_alone() {
     assert_eq!(split.total_work(), Millis::new(2540));
 
     // `heavy` had two producers, and both parts inherit both of them: deep -> mid stays as it was,
-    // mid and shared each feed both parts, `app` takes one part because it is the only dependent
-    // and so ranks first, and shared -> app is untouched. 1 + 2 + 2 + 1 + 1 = 7 edges.
+    // mid and shared each feed both parts, `app` attaches to part a because at 1/4 part a is the
+    // one that finishes first, and shared -> app is untouched. 1 + 2 + 2 + 1 + 1 = 7 edges.
     assert_eq!(split.edge_count(), 7);
     let new_mid = kept(&applied, mid);
     let new_shared = kept(&applied, shared);
