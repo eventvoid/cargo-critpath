@@ -29,10 +29,14 @@
 //! filesystem.
 #![forbid(unsafe_code)]
 
+pub mod cli;
 pub mod collect;
 mod error;
+mod findings;
 mod input;
+mod json;
 mod metadata;
+mod report;
 mod timings;
 mod units;
 mod verbose;

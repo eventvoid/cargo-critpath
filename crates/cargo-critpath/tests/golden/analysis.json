@@ -1,0 +1,404 @@
+{
+  "schema_version": 1,
+  "tool_version": "0.1.0",
+  "input": {
+    "cargo_version": null,
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "host": "aarch64-apple-darwin",
+    "target": "aarch64-apple-darwin",
+    "profile": "dev",
+    "jobs": 4,
+    "observed_max_concurrency": 3,
+    "units_total": 9,
+    "units_fresh": 0,
+    "compilation_span_ms": 1310,
+    "reported_total_ms": 1400,
+    "excluded_prefix_ms": 90
+  },
+  "graph": {
+    "units": 9,
+    "edges": 9,
+    "metadata_edges": 1,
+    "total_work_ms": 2430
+  },
+  "baseline": {
+    "executors": 4,
+    "critical_path_ms": 1310,
+    "area_bound_ms": 608,
+    "lower_bound_ms": 1310,
+    "simulated_makespan_ms": 1310,
+    "policy": "cargo-like",
+    "constraint": "graph",
+    "mean_parallelism": 1.85
+  },
+  "critical_path": [
+    {
+      "unit": 2,
+      "label": {"package": "leaf", "version": "0.1.0", "target": "build-script"},
+      "kind": "build-script-compile",
+      "enter_ms": 0,
+      "exit_ms": 90,
+      "contribution_ms": 90,
+      "incoming_edge_kind": null,
+      "total_ms": 90,
+      "metadata_at_ms": null
+    },
+    {
+      "unit": 3,
+      "label": {"package": "leaf", "version": "0.1.0", "target": "build-script (run)"},
+      "kind": "build-script-run",
+      "enter_ms": 90,
+      "exit_ms": 490,
+      "contribution_ms": 400,
+      "incoming_edge_kind": "full",
+      "total_ms": 400,
+      "metadata_at_ms": null
+    },
+    {
+      "unit": 4,
+      "label": {"package": "leaf", "version": "0.1.0", "target": "lib"},
+      "kind": "lib",
+      "enter_ms": 490,
+      "exit_ms": 530,
+      "contribution_ms": 40,
+      "incoming_edge_kind": "full",
+      "total_ms": 40,
+      "metadata_at_ms": 30
+    },
+    {
+      "unit": 1,
+      "label": {"package": "hello-macros", "version": "0.1.0", "target": "lib"},
+      "kind": "proc-macro",
+      "enter_ms": 530,
+      "exit_ms": 680,
+      "contribution_ms": 150,
+      "incoming_edge_kind": "full",
+      "total_ms": 150,
+      "metadata_at_ms": null
+    },
+    {
+      "unit": 8,
+      "label": {"package": "mid", "version": "0.1.0", "target": "lib"},
+      "kind": "lib",
+      "enter_ms": 680,
+      "exit_ms": 1200,
+      "contribution_ms": 520,
+      "incoming_edge_kind": "full",
+      "total_ms": 520,
+      "metadata_at_ms": 510
+    },
+    {
+      "unit": 0,
+      "label": {"package": "app", "version": "0.1.0", "target": "demo"},
+      "kind": "bin",
+      "enter_ms": 1200,
+      "exit_ms": 1310,
+      "contribution_ms": 110,
+      "incoming_edge_kind": "full",
+      "total_ms": 110,
+      "metadata_at_ms": null
+    }
+  ],
+  "units": [
+    {
+      "unit": 0,
+      "label": {"package": "app", "version": "0.1.0", "target": "demo"},
+      "kind": "bin",
+      "total_ms": 110,
+      "metadata_at_ms": null,
+      "earliest_start_ms": 1200,
+      "earliest_finish_ms": 1310,
+      "latest_finish_ms": 1310,
+      "slack_ms": 0,
+      "on_critical_path": true,
+      "dependencies": 2,
+      "dependents": 0
+    },
+    {
+      "unit": 1,
+      "label": {"package": "hello-macros", "version": "0.1.0", "target": "lib"},
+      "kind": "proc-macro",
+      "total_ms": 150,
+      "metadata_at_ms": null,
+      "earliest_start_ms": 530,
+      "earliest_finish_ms": 680,
+      "latest_finish_ms": 680,
+      "slack_ms": 0,
+      "on_critical_path": true,
+      "dependencies": 1,
+      "dependents": 1
+    },
+    {
+      "unit": 2,
+      "label": {"package": "leaf", "version": "0.1.0", "target": "build-script"},
+      "kind": "build-script-compile",
+      "total_ms": 90,
+      "metadata_at_ms": null,
+      "earliest_start_ms": 0,
+      "earliest_finish_ms": 90,
+      "latest_finish_ms": 90,
+      "slack_ms": 0,
+      "on_critical_path": true,
+      "dependencies": 0,
+      "dependents": 1
+    },
+    {
+      "unit": 3,
+      "label": {"package": "leaf", "version": "0.1.0", "target": "build-script (run)"},
+      "kind": "build-script-run",
+      "total_ms": 400,
+      "metadata_at_ms": null,
+      "earliest_start_ms": 90,
+      "earliest_finish_ms": 490,
+      "latest_finish_ms": 490,
+      "slack_ms": 0,
+      "on_critical_path": true,
+      "dependencies": 1,
+      "dependents": 1
+    },
+    {
+      "unit": 4,
+      "label": {"package": "leaf", "version": "0.1.0", "target": "lib"},
+      "kind": "lib",
+      "total_ms": 40,
+      "metadata_at_ms": 30,
+      "earliest_start_ms": 490,
+      "earliest_finish_ms": 530,
+      "latest_finish_ms": 530,
+      "slack_ms": 0,
+      "on_critical_path": true,
+      "dependencies": 1,
+      "dependents": 2
+    },
+    {
+      "unit": 5,
+      "label": {"package": "libc", "version": "0.2.189", "target": "build-script"},
+      "kind": "build-script-compile",
+      "total_ms": 150,
+      "metadata_at_ms": null,
+      "earliest_start_ms": 0,
+      "earliest_finish_ms": 150,
+      "latest_finish_ms": 230,
+      "slack_ms": 80,
+      "on_critical_path": false,
+      "dependencies": 0,
+      "dependents": 1
+    },
+    {
+      "unit": 6,
+      "label": {"package": "libc", "version": "0.2.189", "target": "build-script (run)"},
+      "kind": "build-script-run",
+      "total_ms": 690,
+      "metadata_at_ms": null,
+      "earliest_start_ms": 150,
+      "earliest_finish_ms": 840,
+      "latest_finish_ms": 920,
+      "slack_ms": 80,
+      "on_critical_path": false,
+      "dependencies": 1,
+      "dependents": 1
+    },
+    {
+      "unit": 7,
+      "label": {"package": "libc", "version": "0.2.189", "target": "lib"},
+      "kind": "lib",
+      "total_ms": 280,
+      "metadata_at_ms": 260,
+      "earliest_start_ms": 840,
+      "earliest_finish_ms": 1120,
+      "latest_finish_ms": 1200,
+      "slack_ms": 80,
+      "on_critical_path": false,
+      "dependencies": 1,
+      "dependents": 1
+    },
+    {
+      "unit": 8,
+      "label": {"package": "mid", "version": "0.1.0", "target": "lib"},
+      "kind": "lib",
+      "total_ms": 520,
+      "metadata_at_ms": 510,
+      "earliest_start_ms": 680,
+      "earliest_finish_ms": 1200,
+      "latest_finish_ms": 1200,
+      "slack_ms": 0,
+      "on_critical_path": true,
+      "dependencies": 2,
+      "dependents": 1
+    }
+  ],
+  "scenarios": [
+    {
+      "kind": "split-crate",
+      "target": {"package": "hello-macros", "version": "0.1.0", "target": "lib"},
+      "exact": false,
+      "fraction_swept": {"low": 0.25, "high": 0.75},
+      "overhead_ms": 0,
+      "assumptions": [
+        "the division of work between the halves is swept from 0.25 to 0.75; no single division is assumed",
+        "each half pays the per-crate overhead given by overhead_ms, which defaults to zero because no measurement of it exists",
+        "dependent assignment: optimistic and pessimistic bounds coincide at an even division, so the interval is made of the sweep over the division rather than of that pair",
+        "the optimistic bound attaches every dependent to whichever half finishes first, which is a limit a plausible refactor cannot beat rather than a shape anyone would write"
+      ],
+      "critical_path_ms": {"low": 1230, "high": 1273},
+      "saving_ms": {"low": 37, "high": 80},
+      "simulated_makespan_ms": {"low": 1230, "high": 1273},
+      "anomaly": false,
+      "notes": []
+    },
+    {
+      "kind": "split-crate",
+      "target": {"package": "mid", "version": "0.1.0", "target": "lib"},
+      "exact": false,
+      "fraction_swept": {"low": 0.25, "high": 0.75},
+      "overhead_ms": 0,
+      "assumptions": [
+        "the division of work between the halves is swept from 0.25 to 0.75; no single division is assumed",
+        "each half pays the per-crate overhead given by overhead_ms, which defaults to zero because no measurement of it exists",
+        "dependent assignment: optimistic and pessimistic bounds coincide at an even division, so the interval is made of the sweep over the division rather than of that pair",
+        "the optimistic bound attaches every dependent to whichever half finishes first, which is a limit a plausible refactor cannot beat rather than a shape anyone would write"
+      ],
+      "critical_path_ms": {"low": 1230, "high": 1230},
+      "saving_ms": {"low": 80, "high": 80},
+      "simulated_makespan_ms": {"low": 1230, "high": 1230},
+      "anomaly": false,
+      "notes": [
+        "every division in the sweep gives the same critical path, because what the split releases is bounded by something else; a range of zero width here is a degeneracy rather than extra confidence in the number"
+      ]
+    },
+    {
+      "kind": "split-crate",
+      "target": {"package": "app", "version": "0.1.0", "target": "demo"},
+      "exact": false,
+      "fraction_swept": {"low": 0.25, "high": 0.75},
+      "overhead_ms": 0,
+      "assumptions": [
+        "the division of work between the halves is swept from 0.25 to 0.75; no single division is assumed",
+        "each half pays the per-crate overhead given by overhead_ms, which defaults to zero because no measurement of it exists",
+        "dependent assignment: optimistic and pessimistic bounds coincide at an even division, so the interval is made of the sweep over the division rather than of that pair",
+        "the optimistic bound attaches every dependent to whichever half finishes first, which is a limit a plausible refactor cannot beat rather than a shape anyone would write"
+      ],
+      "critical_path_ms": {"low": 1255, "high": 1283},
+      "saving_ms": {"low": 27, "high": 55},
+      "simulated_makespan_ms": {"low": 1255, "high": 1283},
+      "anomaly": false,
+      "notes": []
+    },
+    {
+      "kind": "split-crate",
+      "target": {"package": "leaf", "version": "0.1.0", "target": "lib"},
+      "exact": false,
+      "fraction_swept": {"low": 0.25, "high": 0.75},
+      "overhead_ms": 0,
+      "assumptions": [
+        "the division of work between the halves is swept from 0.25 to 0.75; no single division is assumed",
+        "each half pays the per-crate overhead given by overhead_ms, which defaults to zero because no measurement of it exists",
+        "dependent assignment: optimistic and pessimistic bounds coincide at an even division, so the interval is made of the sweep over the division rather than of that pair",
+        "the optimistic bound attaches every dependent to whichever half finishes first, which is a limit a plausible refactor cannot beat rather than a shape anyone would write"
+      ],
+      "critical_path_ms": {"low": 1280, "high": 1300},
+      "saving_ms": {"low": 10, "high": 30},
+      "simulated_makespan_ms": {"low": 1280, "high": 1300},
+      "anomaly": false,
+      "notes": []
+    },
+    {
+      "kind": "set-executors",
+      "target": {"executors": 1},
+      "exact": true,
+      "fraction_swept": null,
+      "overhead_ms": null,
+      "assumptions": [
+        "the per-unit weights come from one build at one executor count and are not invariant to it: measured elsewhere, total unit work fell 23% to 30% between ten executors and two",
+        "one unit occupies one executor, which is not what Cargo does: a rustc holds one jobserver token for its lifetime and acquires more for parallel codegen, and a build-script execution takes none at all"
+      ],
+      "critical_path_ms": {"low": 1310, "high": 1310},
+      "saving_ms": {"low": 0, "high": 0},
+      "simulated_makespan_ms": {"low": 2430, "high": 2430},
+      "anomaly": false,
+      "notes": [
+        "below the 4 executors the weights were measured at, so this makespan is pessimistic: the same compilations take less time when fewer of them run at once"
+      ]
+    },
+    {
+      "kind": "set-executors",
+      "target": {"executors": 2},
+      "exact": true,
+      "fraction_swept": null,
+      "overhead_ms": null,
+      "assumptions": [
+        "the per-unit weights come from one build at one executor count and are not invariant to it: measured elsewhere, total unit work fell 23% to 30% between ten executors and two",
+        "one unit occupies one executor, which is not what Cargo does: a rustc holds one jobserver token for its lifetime and acquires more for parallel codegen, and a build-script execution takes none at all"
+      ],
+      "critical_path_ms": {"low": 1310, "high": 1310},
+      "saving_ms": {"low": 0, "high": 0},
+      "simulated_makespan_ms": {"low": 1310, "high": 1310},
+      "anomaly": false,
+      "notes": [
+        "the knee: from 2 executors on, the critical path dominates total work divided between them, so more executors cannot shorten this build",
+        "below the 4 executors the weights were measured at, so this makespan is pessimistic: the same compilations take less time when fewer of them run at once"
+      ]
+    },
+    {
+      "kind": "set-executors",
+      "target": {"executors": 4},
+      "exact": true,
+      "fraction_swept": null,
+      "overhead_ms": null,
+      "assumptions": [
+        "the per-unit weights come from one build at one executor count and are not invariant to it: measured elsewhere, total unit work fell 23% to 30% between ten executors and two",
+        "one unit occupies one executor, which is not what Cargo does: a rustc holds one jobserver token for its lifetime and acquires more for parallel codegen, and a build-script execution takes none at all"
+      ],
+      "critical_path_ms": {"low": 1310, "high": 1310},
+      "saving_ms": {"low": 0, "high": 0},
+      "simulated_makespan_ms": {"low": 1310, "high": 1310},
+      "anomaly": false,
+      "notes": [
+        "the per-unit weights were measured at this executor count, so this is the one absolute time in the scan that the model was calibrated against"
+      ]
+    },
+    {
+      "kind": "set-executors",
+      "target": {"executors": 8},
+      "exact": true,
+      "fraction_swept": null,
+      "overhead_ms": null,
+      "assumptions": [
+        "the per-unit weights come from one build at one executor count and are not invariant to it: measured elsewhere, total unit work fell 23% to 30% between ten executors and two",
+        "one unit occupies one executor, which is not what Cargo does: a rustc holds one jobserver token for its lifetime and acquires more for parallel codegen, and a build-script execution takes none at all"
+      ],
+      "critical_path_ms": {"low": 1310, "high": 1310},
+      "saving_ms": {"low": 0, "high": 0},
+      "simulated_makespan_ms": {"low": 1310, "high": 1310},
+      "anomaly": false,
+      "notes": [
+        "above the 4 executors the weights were measured at, so this makespan is optimistic: the same compilations take longer when more of them compete for memory bandwidth"
+      ]
+    },
+    {
+      "kind": "set-executors",
+      "target": {"executors": 16},
+      "exact": true,
+      "fraction_swept": null,
+      "overhead_ms": null,
+      "assumptions": [
+        "the per-unit weights come from one build at one executor count and are not invariant to it: measured elsewhere, total unit work fell 23% to 30% between ten executors and two",
+        "one unit occupies one executor, which is not what Cargo does: a rustc holds one jobserver token for its lifetime and acquires more for parallel codegen, and a build-script execution takes none at all"
+      ],
+      "critical_path_ms": {"low": 1310, "high": 1310},
+      "saving_ms": {"low": 0, "high": 0},
+      "simulated_makespan_ms": {"low": 1310, "high": 1310},
+      "anomaly": false,
+      "notes": [
+        "above the 4 executors the weights were measured at, so this makespan is optimistic: the same compilations take longer when more of them compete for memory bandwidth"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "noise-floor-unknown",
+      "message": "only one timing report was supplied, so the run-to-run spread could not be measured and no saving can be checked against it; supply --timings once per clean build to measure it"
+    }
+  ]
+}

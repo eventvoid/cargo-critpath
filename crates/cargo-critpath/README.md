@@ -1,7 +1,30 @@
 # cargo-critpath
 
-The Cargo-facing half of `cargo-critpath`: it turns the output of a real build into the weighted
-dependency graph that [`critpath-core`](../critpath-core) analyses.
+The Cargo-facing half of `cargo-critpath`: the `cargo critpath` command, and the parsers that turn
+the output of a real build into the weighted dependency graph that
+[`critpath-core`](../critpath-core) analyses.
+
+## The command
+
+    cargo critpath --log build.log --timings target/cargo-timings/cargo-timing.html
+
+`--timings` is repeatable. Giving one report per clean build of the same commit is how the
+run-to-run spread of the critical path gets measured, and a saving smaller than that spread is
+marked as indistinguishable from noise rather than presented as a finding. With a single report the
+spread is unknown, and the report says so instead of inventing a threshold.
+
+`--format json` writes the document specified in `docs/json-schema.md`, which is a versioned
+contract with a golden test pinning its shape. `--fail-if-critical-path-over <ms>` exits 3 when the
+threshold is exceeded, so a CI script can tell a regression from a tool that could not run:
+
+    0  the analysis completed
+    1  the arguments were wrong, or a path could not be read
+    2  the input was rejected
+    3  the analysis completed and a --fail-if threshold was exceeded
+
+Only `cargo build` is analysed. A report from `cargo check`, `cargo test`, `cargo bench` or
+`cargo doc` is refused by name, because those are different graphs rather than variations on one.
+`cargo critpath --help` lists everything.
 
 ## What it reads
 
