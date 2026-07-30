@@ -31,7 +31,7 @@ saves nothing until its slack is used up.
 Measured on four real projects from 54 to 419 units, all four were limited by the shape of their
 dependency graph rather than by available cores. On bevy the critical path is 99.5% of the entire
 build. Every number in this repository was measured, and the measurements are published together with
-the cases where the model is wrong: see [docs/validation.md](docs/validation.md).
+the cases where the model is wrong: see [docs/validation.md](https://github.com/eventvoid/cargo-critpath/blob/main/docs/validation.md).
 
 ## What it looks like
 
@@ -136,7 +136,7 @@ measured projects fall into exactly that case, which is why the constraint colum
     cargo install cargo-critpath
 
 Rust 1.74 or newer, no system dependencies. The tool depends on two crates, `serde_json` and
-`lexopt`, and pulls no procedural macros — [docs/decisions.md](docs/decisions.md) D3 explains why that
+`lexopt`, and pulls no procedural macros — [docs/decisions.md](https://github.com/eventvoid/cargo-critpath/blob/main/docs/decisions.md) D3 explains why that
 was worth hand-writing the argument parsing for.
 
 ## Use
@@ -161,7 +161,7 @@ Pass `--timings` once per repeated build and the tool measures your run-to-run s
 savings that fall inside it. With one report it says the noise floor is unknown rather than inventing
 a threshold.
 
-`--format json` writes the versioned schema in [docs/json-schema.md](docs/json-schema.md). Exit code
+`--format json` writes the versioned schema in [docs/json-schema.md](https://github.com/eventvoid/cargo-critpath/blob/main/docs/json-schema.md). Exit code
 3 means a `--fail-if` threshold was exceeded, distinct from 1 for a usage error and 2 for unusable
 input, so a CI script never has to parse prose.
 
@@ -171,7 +171,7 @@ check critical paths share exactly one unit.
 
 ## How far to trust the numbers
 
-The model is in [docs/model.md](docs/model.md). What matters before reading an estimate:
+The model is in [docs/model.md](https://github.com/eventvoid/cargo-critpath/blob/main/docs/model.md). What matters before reading an estimate:
 
 **Pipelining is accounted for.** A dependent starts when its dependency emits metadata, not after full
 codegen. Ignoring it overstates the critical path by 3% to 33% on the measured projects.
@@ -234,7 +234,7 @@ feature, or upstreaming a change.
 ## The data it reads
 
 Both inputs are documented, with the surprises, in
-[docs/cargo-data-sources.md](docs/cargo-data-sources.md). Three findings shaped the design:
+[docs/cargo-data-sources.md](https://github.com/eventvoid/cargo-critpath/blob/main/docs/cargo-data-sources.md). Three findings shaped the design:
 
 - There is **no JSON timing output**. `--timings` is a valueless flag on stable and nightly alike; the
   report is HTML and the parser extracts the JavaScript data islands it embeds. That is an
@@ -258,6 +258,7 @@ Both inputs are documented, with the surprises, in
     docs/cargo-data-sources.md   what Cargo emits, established by running it
     docs/decisions.md        every design decision, what was rejected, and why
     docs/json-schema.md      the machine-readable output contract
+    docs/releasing.md        how a version reaches crates.io, and what cannot be undone
 
 ## Licence
 

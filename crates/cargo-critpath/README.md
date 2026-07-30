@@ -2,7 +2,7 @@
 
 The Cargo-facing half of `cargo-critpath`: the `cargo critpath` command, and the parsers that turn
 the output of a real build into the weighted dependency graph that
-[`critpath-core`](../critpath-core) analyses.
+[`critpath-core`](https://github.com/eventvoid/cargo-critpath/tree/main/crates/critpath-core) analyses.
 
 ## The command
 
@@ -13,7 +13,7 @@ run-to-run spread of the critical path gets measured, and a saving smaller than 
 marked as indistinguishable from noise rather than presented as a finding. With a single report the
 spread is unknown, and the report says so instead of inventing a threshold.
 
-`--format json` writes the document specified in `docs/json-schema.md`, which is a versioned
+`--format json` writes the document specified in [`docs/json-schema.md`](https://github.com/eventvoid/cargo-critpath/blob/main/docs/json-schema.md), which is a versioned
 contract with a golden test pinning its shape. `--fail-if-critical-path-over <ms>` exits 3 when the
 threshold is exceeded, so a CI script can tell a regression from a tool that could not run:
 

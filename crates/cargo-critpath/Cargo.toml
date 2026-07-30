@@ -6,9 +6,10 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-categories.workspace = true
-keywords.workspace = true
+categories = ["development-tools::cargo-plugins", "development-tools::profiling"]
+keywords = ["cargo", "build-time", "critical-path", "scheduling"]
 readme = "README.md"
+documentation = "https://docs.rs/cargo-critpath"
 
 [[bin]]
 name = "cargo-critpath"
