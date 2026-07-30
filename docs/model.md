@@ -10,10 +10,11 @@ A **unit** is one indivisible piece of scheduled work: one `rustc` invocation, o
 of a build-script binary. It is the node type of the graph.
 
     Unit {
-        label:       UnitLabel,       // package, version, target — for display only
-        kind:        UnitKind,
-        total:       Millis,          // wall time of the whole unit
-        metadata_at: Option<Millis>,  // offset from unit start at which rmeta is emitted
+        label:                 UnitLabel,       // package, version, target — for display only
+        kind:                  UnitKind,
+        total:                 Millis,          // wall time of the whole unit
+        metadata_at:           Option<Millis>,  // offset from start at which metadata is emitted
+        requires_full_closure: bool,            // see section 3.1
     }
 
 `metadata_at` is `Some` exactly when the unit is pipelined — when Cargo invokes `rustc` with an
@@ -51,11 +52,66 @@ and the earliest `U` could begin:
 
     ready(U) = max over incoming e of release(e),   or 0 if U has no incoming edges
 
+## 3.1 Units that link need their whole closure, not just their neighbours
+
+Direct edges are not the whole constraint. A unit that produces a *linked* artifact — a binary,
+a test, a proc-macro, a `cdylib`, `dylib` or `staticlib` — cannot run until every unit in its
+**transitive** dependency closure is completely finished, not merely its immediate
+dependencies. Such a unit has `requires_full_closure = true`.
+
+The reason is that pipelining lets a library's `.rlib` be produced from its dependencies'
+*metadata*, so an `.rlib` can exist on disk while the `.rlib` of something it depends on does
+not yet. A linker needs all of them.
+
+This was measured rather than assumed. Three libraries and a binary, where `biga` is large and
+`smallb` and `cbin` are trivial, and `cbin` depends only on `smallb`:
+
+    biga    start 0.05  metadata at 0.77  full end 1.24
+    smallb  start 0.77  -> released by biga's metadata, as expected
+    smallb            full end 0.82
+    cbin    start 1.25  -> NOT 0.82
+
+`cbin` waited for `biga`, which it does not name as a dependency. A model built from direct
+edges alone would have predicted `cbin` starting at 0.82 and would have understated this
+critical path by about 30%.
+
+The rule applies to proc-macros and not to ordinary libraries. With `biga <- mid` and both
+`pmc` (a proc-macro) and `toplib` (a library) depending only on `mid`:
+
+    biga    metadata at 1.02   full end 1.48
+    mid     metadata at 1.05   full end 1.09
+    toplib  start 1.05   -> released by mid's metadata; no closure requirement
+    pmc     start 1.49   -> waited for biga's full end; closure requirement applies
+
+So `requires_full_closure` is a property of the consumer, and it reaches past its neighbours.
+
+**It does not need a transitive closure to be materialised.** Define, over units in topological
+order,
+
+    maxFullEft(U) = max over direct dependencies D of  max( eft(D), maxFullEft(D) )
+                    0 if U has no dependencies
+
+which is the latest finish time anywhere in `U`'s transitive dependency closure. Then
+
+    est(U) = maxFullEft(U)                                if requires_full_closure(U)
+    est(U) = max over incoming e of release(e)            otherwise
+
+This is a single pass in topological order and stays `O(V + E)`; no closure is enumerated and no
+`O(V^2)` edge set is built. Keeping it derived rather than materialised also means the
+counterfactual transformations of section 9 stay correct automatically: when a transformation
+changes the graph, the closures it implies change with it, which materialised edges would not.
+
+Verified against the second fixture: the recurrence puts `toplib` at 0.80, `pmc` at 1.24 and
+`mid` at 0.78 relative to `biga`'s start, against observed 0.81, 1.25 and 0.79 — inside the
+10 ms resolution of the input.
+
 ## 4. Critical path
 
-With unlimited executors every unit starts exactly at `ready(U)`. Define
+With unlimited executors every unit starts exactly at its earliest start time. Define, in
+topological order,
 
-    est(U) = max over incoming e of release(e) using est,   0 if no incoming
+    est(U) = as given in section 3.1, which is ready(U) for an ordinary unit
+             and maxFullEft(U) for a unit that requires its full closure
     eft(U) = est(U) + total(U)
     CP     = max over all U of eft(U)
 
@@ -85,13 +141,29 @@ The simulator is a non-preemptive list scheduler:
    migration.
 5. `makespan(J)` is the time the last unit finishes.
 
-**Priority.** Ties have to be broken deterministically or the output is not reproducible. The
-default priority is *longest remaining path to a sink first*, with unit identity as the final
-tiebreak. Unit ordering is canonical and never derived from hash iteration order.
+**Priority.** Ties have to be broken deterministically or the output is not reproducible. Unit
+ordering is canonical and never derived from hash iteration order.
 
-The priority is a property of this simulator, not of Cargo. Cargo's real queue order is not
-critical-path-first, so `makespan(J)` is an estimate of Cargo's wall time, whereas the bounds in
-section 6 are guarantees.
+Two policies are offered, because they answer different questions.
+
+- `cargo-like` (**default**) reproduces what Cargo actually does. Cargo's scheduler is
+  *cost-blind*: it assigns every unit a fixed cost of 100 and sets a unit's priority to its own
+  cost plus the cost of all of its transitive reverse-dependencies, which reduces to
+  `1 + (number of transitive reverse-dependents)`. It knows nothing about how long anything
+  takes. Reproducing this is the only way `makespan(J)` estimates Cargo's wall time rather than
+  the wall time of a better build system.
+
+- `longest-path` schedules the unit with the longest remaining path to a sink first. It is the
+  standard critical-path heuristic and gives a *better* schedule than Cargo's. It is offered so
+  that the gap between the two can be read off: that gap is how much is lost to Cargo's ordering
+  alone, as opposed to the shape of the graph.
+
+**Cargo's real ordering is not deterministic.** Having selected the maximum priority, Cargo
+breaks ties by hash-map iteration order. Two runs of the same build can therefore schedule
+differently, which puts a floor on how accurately any simulator can predict a single run. The
+simulator breaks the same ties by unit identity so that its own output is reproducible, and the
+resulting difference is one of the reasons `makespan(J)` is labelled an estimate while the bounds
+in section 6 are guarantees.
 
 ## 6. Two policy-independent bounds
 
@@ -149,6 +221,18 @@ critical path.
 cannot increase `CP`, because `metadata_at <= total`.
 
 **I14 — Weight monotonicity.** Increasing any `total(U)` cannot decrease `CP`.
+
+**I16 — A closure requirement can only delay.** Setting `requires_full_closure` on any unit
+cannot decrease `CP`, and clearing it on any unit cannot increase `CP`.
+
+**I17 — A closure requirement subsumes direct edges.** For a unit `U` with
+`requires_full_closure`, `est(U) >= eft(D)` for every `D` in its transitive dependency closure,
+not merely for its direct dependencies.
+
+**I18 — The recurrence equals the enumerated closure.** `maxFullEft(U)` computed by the
+recurrence of section 3.1 equals `max over D in transitiveDeps(U) of eft(D)`, computed by
+explicit enumeration. This is a differential test against a deliberately naive implementation,
+because the recurrence is the part of the model most likely to be subtly wrong.
 
 **I15 — Chain and fan closed forms.** For a chain of `n` units of weight `w` joined by `Full`
 edges, `CP = n*w`. For one source fanning out to `n` sinks, `CP = w_source + max w_sink`. The
