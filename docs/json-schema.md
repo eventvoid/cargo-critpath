@@ -216,7 +216,7 @@ match on; `message` is prose and may change in any release. Codes may be added w
 | --- | --- |
 | 0 | analysis completed |
 | 1 | usage error: bad arguments, unreadable path |
-| 2 | input rejected: fresh units present, no timing report, unparseable report, empty graph |
+| 2 | input rejected: fresh units present, no timing report, unparseable report, empty graph, or an input that is not UTF-8 |
 | 3 | analysis completed and a `--fail-if` threshold was exceeded |
 
 Exit code 3 exists so a CI job can distinguish "the build graph regressed past my threshold" from
