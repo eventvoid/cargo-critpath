@@ -278,3 +278,172 @@ fn metadata_that_is_not_metadata_is_named_as_such() {
     assert!(matches!(err, ParseError::Metadata { .. }), "{err}");
     assert!(err.to_string().contains("cargo metadata"), "{err}");
 }
+
+/// A build whose critical path runs *through* metadata edges.
+///
+/// The workspace fixture's only metadata edge is off its critical path, so every step there
+/// contributes its whole duration and nothing end to end distinguishes crediting pipelining from
+/// ignoring it. Pipelining is the model's central claim, so it is asserted here on a graph built for
+/// the purpose.
+mod pipelined {
+    use super::*;
+
+    /// `a` and `b` take a second each and emit metadata early; `c` is off the path; `app` links.
+    /// `d` emits no metadata at all despite the report giving it a frontend section.
+    fn log() -> String {
+        let mut text = String::from("   Compiling a v1.0.0\n");
+        for (name, extra, hash, emit, kind, extern_arg) in [
+            (
+                "a",
+                "-1111111111111111",
+                "aaaa0000aaaa0001",
+                "dep-info,metadata,link",
+                "lib",
+                "",
+            ),
+            (
+                "b",
+                "-2222222222222222",
+                "bbbb0000bbbb0002",
+                "dep-info,metadata,link",
+                "lib",
+                "--extern a=/ws/target/debug/deps/liba-1111111111111111.rmeta",
+            ),
+            (
+                "c",
+                "-3333333333333333",
+                "cccc0000cccc0003",
+                "dep-info,metadata,link",
+                "lib",
+                "--extern b=/ws/target/debug/deps/libb-2222222222222222.rmeta",
+            ),
+            (
+                "app",
+                "-4444444444444444",
+                "dddd0000dddd0004",
+                "dep-info,link",
+                "bin",
+                "--extern c=/ws/target/debug/deps/libc-3333333333333333.rlib",
+            ),
+            (
+                "d",
+                "-5555555555555555",
+                "eeee0000eeee0005",
+                "dep-info,link",
+                "proc-macro",
+                "",
+            ),
+        ] {
+            let source = if name == "app" { "main.rs" } else { "lib.rs" };
+            text.push_str(&format!(
+                " Running `/tc/bin/rustc --crate-name {name} --edition=2021 \
+                 /reg/{name}-1.0.0/src/{source} --crate-type {kind} --emit={emit} \
+                 -C metadata={hash} -C extra-filename={extra} \
+                 --out-dir /ws/target/debug/deps {extern_arg}`\n"
+            ));
+        }
+        text
+    }
+
+    fn timing() -> String {
+        // durations in seconds, and where the frontend section ends
+        let units = [
+            (0, "a", "", 0.0, 1.0, Some(0.2)),
+            (1, "b", "", 0.2, 1.0, Some(0.3)),
+            (2, "c", "", 0.5, 0.5, Some(0.4)),
+            (3, "app", " app \\\"bin\\\"", 1.2, 0.1, None),
+            // A frontend section, yet `--emit` never mentioned metadata: nothing may wait on it.
+            (4, "d", "", 0.0, 0.6, Some(0.5)),
+        ];
+        let entries: Vec<String> = units
+            .iter()
+            .map(|(i, name, target, start, duration, frontend)| {
+                let sections = match frontend {
+                    Some(end) => format!(
+                        "[[\"frontend\",{{\"start\":0.0,\"end\":{end}}}],\
+                         [\"codegen\",{{\"start\":{end},\"end\":{duration}}}]]"
+                    ),
+                    // Cargo writes `null`, not an empty list, for a unit that is not pipelined.
+                    None => "null".to_owned(),
+                };
+                format!(
+                    "{{\"i\":{i},\"name\":\"{name}\",\"version\":\"1.0.0\",\"mode\":\"todo\",\
+                     \"target\":\"{target}\",\"features\":[],\"start\":{start},\
+                     \"duration\":{duration},\"unblocked_units\":[],\
+                     \"unblocked_rmeta_units\":[],\"sections\":{sections}}}"
+                )
+            })
+            .collect();
+        format!(
+            "<html><body>\n<table class=\"summary-table\">\n\
+             <tr>\n<td>Targets:</td><td>app 1.0.0 ( app \"bin\")</td>\n</tr>\n\
+             <tr>\n<td>Profile:</td><td>dev</td>\n</tr>\n\
+             <tr>\n<td>Fresh units:</td><td>0</td>\n</tr>\n\
+             <tr>\n<td>Dirty units:</td><td>5</td>\n</tr>\n\
+             <tr>\n<td>Total units:</td><td>5</td>\n</tr>\n\
+             <tr>\n<td>Max concurrency:</td><td>3 (jobs=4 ncpu=8)</td>\n</tr>\n\
+             <tr>\n<td>Total time:</td><td>1.3s</td>\n</tr>\n\
+             <tr>\n<td>rustc:</td><td>rustc 1.95.0 (59807616e 2026-04-14)<br>\
+             Host: aarch64-apple-darwin<br>Target: aarch64-apple-darwin</td>\n</tr>\n\
+             </table>\n<script>\nDURATION = 2;\nconst UNIT_DATA = [\n{}\n];\n\
+             const CONCURRENCY_DATA = [\n{{\"t\":0.1,\"active\":2,\"waiting\":0,\"inactive\":3}}\n];\n\
+             const CPU_USAGE = [\n[0.0,50.0]\n];\n</script></body></html>\n",
+            entries.join(",\n")
+        )
+    }
+
+    #[test]
+    fn the_critical_path_credits_metadata_rather_than_whole_durations() {
+        let input = cargo_critpath::parse(&log(), &timing()).unwrap();
+        let graph = &input.graph;
+        let analysis = critpath_core::analyze(graph);
+
+        let named = |package: &str| {
+            graph
+                .units()
+                .find(|(_, unit)| unit.package == package)
+                .map(|(id, _)| id)
+                .unwrap()
+        };
+        let (a, b, c, app) = (named("a"), named("b"), named("c"), named("app"));
+
+        // Hand-computed. `a` runs 0..1000 and emits metadata at 200, so `b` starts at 200 and ends
+        // at 1200, emitting its own metadata at 500. `c` starts at 500 and ends at 1000. `app`
+        // links, so it waits for its whole closure to finish, which is `b` at 1200, and ends at
+        // 1300.
+        assert_eq!(analysis.earliest_start(b), Some(Millis::new(200)));
+        assert_eq!(analysis.earliest_start(c), Some(Millis::new(500)));
+        assert_eq!(analysis.earliest_start(app), Some(Millis::new(1_200)));
+        assert_eq!(analysis.critical_path_len(), Millis::new(1_300));
+
+        // Summing the whole durations along the path would give 1000 + 1000 + 100 = 2100. The
+        // critical path is 1300 because `a` only has to reach its metadata before `b` may start.
+        assert_eq!(analysis.critical_path(), &[a, b, app]);
+        assert_eq!(analysis.critical_contribution(a), Some(Millis::new(200)));
+        assert_eq!(analysis.critical_contribution(b), Some(Millis::new(1_000)));
+        assert_eq!(analysis.critical_contribution(app), Some(Millis::new(100)));
+        // Pinned so that the comparison above is a statement about pipelining and not about
+        // whatever `a`'s duration happened to parse as: 200 of 1000, and the durations along the
+        // path total 2100 against a critical path of 1300.
+        assert_eq!(graph.unit(a).unwrap().total, Millis::new(1_000));
+        assert_eq!(graph.unit(b).unwrap().total, Millis::new(1_000));
+        assert_eq!(graph.unit(app).unwrap().total, Millis::new(100));
+
+        // The identity this fixture exists to make non-vacuous.
+        let summed = [a, b, app]
+            .iter()
+            .map(|id| analysis.critical_contribution(*id).unwrap())
+            .fold(Millis::ZERO, Millis::saturating_add);
+        assert_eq!(summed, analysis.critical_path_len());
+
+        // `c` is not on the path at all: it finishes at 1000 while `b` finishes at 1200.
+        assert_eq!(analysis.critical_contribution(c), None);
+        assert!(analysis.slack(c).unwrap() > Millis::ZERO);
+
+        // A unit whose `--emit` omitted metadata emits none, whatever sections the report gives it.
+        let d = named("d");
+        assert_eq!(graph.unit(d).unwrap().metadata_at, None);
+        assert_eq!(graph.unit(a).unwrap().metadata_at, Some(Millis::new(200)));
+        assert!(graph.unit(app).unwrap().requires_full_closure);
+    }
+}

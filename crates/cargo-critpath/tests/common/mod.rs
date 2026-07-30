@@ -77,14 +77,52 @@ pub fn golden(name: &str) -> PathBuf {
 /// otherwise fail this test on Windows for a reason that has nothing to do with the tool.
 pub fn assert_golden(name: &str, actual: &str, regenerate: &str) {
     let path = golden(name);
+    // Both sides are normalised: a golden file checked out with CRLF, or a tool that emits CRLF,
+    // must not make every comparison fail on line endings alone.
     let expected = fs::read_to_string(&path)
         .unwrap_or_default()
         .replace("\r\n", "\n");
-    assert!(
-        expected == actual,
-        "output no longer matches tests/golden/{name}.\n\
-         If the change is deliberate, regenerate it with:\n  {regenerate}\n\
-         --- expected ---\n{expected}\n--- actual ---\n{actual}"
+    let actual = actual.replace("\r\n", "\n");
+    if expected == actual {
+        return;
+    }
+    // Interpolating two four-hundred-line documents says that something moved, not what. Report the
+    // differing lines with their numbers so a one-field change is legible.
+    let mut differences = String::new();
+    let mut expected_lines = expected.lines();
+    let mut actual_lines = actual.lines();
+    let mut line = 0usize;
+    loop {
+        line += 1;
+        match (expected_lines.next(), actual_lines.next()) {
+            (None, None) => break,
+            (was, now) if was == now => continue,
+            (was, now) => {
+                differences.push_str(&format!(
+                    "  line {line}:\n    expected: {}\n    actual:   {}\n",
+                    was.unwrap_or("<end of file>"),
+                    now.unwrap_or("<end of file>"),
+                ));
+            }
+        }
+    }
+    if differences.is_empty() {
+        panic!(
+            "output no longer matches tests/golden/{name}, though every line is identical: \
+             the difference is a trailing newline or the line endings. \
+             Expected {} bytes, got {}.\n\
+             If the change is deliberate, regenerate it with:\n  {regenerate}",
+            expected.len(),
+            actual.len(),
+        );
+    }
+    panic!(
+        "output no longer matches tests/golden/{name}, on {} line(s):\n{differences}\n\
+         If the change is deliberate, regenerate it with:\n  {regenerate}",
+        differences
+            .lines()
+            .filter(|l| l.starts_with("  line "))
+            .count(),
     );
 }
 

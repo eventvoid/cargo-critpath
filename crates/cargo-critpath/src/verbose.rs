@@ -56,7 +56,8 @@ pub struct Invocation {
     pub role: Role,
     /// The `--crate-name`, or empty for a build-script execution.
     pub crate_name: String,
-    /// Every `--crate-type`. Empty means a binary, which is what Cargo passes for a bare `bin`.
+    /// Every `--crate-type`. Cargo writes one for a binary too; empty is the fallback, and is read
+    /// as something that links, since assuming a library would drop a closure requirement.
     pub crate_types: Vec<String>,
     /// The `--emit` list.
     pub emits: Vec<String>,

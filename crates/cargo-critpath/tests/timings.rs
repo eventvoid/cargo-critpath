@@ -260,3 +260,19 @@ fn crlf_line_endings_are_handled() {
     assert_eq!(parsed.units.len(), 4);
     assert_eq!(parsed.jobs, Some(10));
 }
+
+#[test]
+fn a_duration_is_rounded_to_the_nearest_millisecond() {
+    // The report gives seconds. A duration halfway between two milliseconds has to go to the nearer
+    // one rather than towards zero, or every unit is reported very slightly faster than it was and
+    // the error accumulates along a path.
+    let unit = r#"{"i":0,"name":"demo","version":"0.1.0","mode":"todo","target":"",
+      "features":[],"start":0.0,"duration":0.0625,
+      "unblocked_units":[],"unblocked_rmeta_units":[],
+      "sections":[["frontend",{"start":0.0,"end":0.0375}],["codegen",{"start":0.0375,"end":0.0625}]]}"#;
+    let parsed = cargo_critpath::parse_timing_report(&report(0, 1, unit)).unwrap();
+
+    // 0.0625 s is exactly 62.5 ms, and 0.0375 s exactly 37.5 ms.
+    assert_eq!(parsed.units[0].duration, Millis::new(63));
+    assert_eq!(parsed.units[0].metadata_at, Some(Millis::new(38)));
+}

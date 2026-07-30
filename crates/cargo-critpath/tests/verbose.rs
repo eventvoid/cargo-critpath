@@ -459,3 +459,30 @@ fn a_utf16_log_is_named_as_such_rather_than_called_empty() {
         1
     );
 }
+
+#[test]
+fn an_invocation_with_no_crate_type_is_a_binary_that_links() {
+    // Cargo does write `--crate-type bin` for a plain binary, so this is not a shape it emits for
+    // one. What it omits `--crate-type` for is a test or bench target, and those are recognised by
+    // their harness flag before this branch is reached. The branch is the conservative fallback:
+    // absent any crate type, assume something that links, because a unit read as a library loses
+    // its closure requirement and that makes the critical path shorter than it is.
+    let text = "   Compiling demo v0.1.0\n\
+         Running `/tc/bin/rustc --crate-name demo --edition=2021 /reg/demo-0.1.0/src/main.rs \
+         --emit=dep-info,link -C metadata=eeee0000eeee0000 \
+         -C extra-filename=-5555555555555555 --out-dir /ws/target/debug/deps`\n";
+    let parsed = cargo_critpath::parse_verbose_log(text).unwrap();
+
+    assert_eq!(parsed.invocations.len(), 1);
+    let demo = &parsed.invocations[0];
+    assert!(demo.crate_types.is_empty(), "Cargo passed none");
+    assert_eq!(demo.kind, UnitKind::Bin);
+    assert!(
+        demo.requires_full_closure,
+        "a binary links, so it waits for its whole closure"
+    );
+    assert!(
+        !demo.pipelined,
+        "and emits no metadata for anyone to wait on"
+    );
+}
