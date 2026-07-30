@@ -41,8 +41,12 @@ fn check(directory: &Path, findings: &mut Vec<String>) {
 
 #[test]
 fn no_fixture_carries_an_absolute_path_from_the_machine_that_produced_it() {
-    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut findings = Vec::new();
-    check(&fixtures, &mut findings);
+    // The golden files are the tool's own output over those fixtures, so anything that leaked into
+    // a fixture leaks into them too.
+    for directory in ["tests/fixtures", "tests/golden"] {
+        check(&root.join(directory), &mut findings);
+    }
     assert!(findings.is_empty(), "{}", findings.join("\n"));
 }

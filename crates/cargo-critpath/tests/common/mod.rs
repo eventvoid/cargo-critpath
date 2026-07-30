@@ -72,9 +72,14 @@ pub fn golden(name: &str) -> PathBuf {
 }
 
 /// Compares output against a committed golden file, printing the command to regenerate it.
+///
+/// Line endings are normalised on the way in, because a checkout that translates them would
+/// otherwise fail this test on Windows for a reason that has nothing to do with the tool.
 pub fn assert_golden(name: &str, actual: &str, regenerate: &str) {
     let path = golden(name);
-    let expected = fs::read_to_string(&path).unwrap_or_default();
+    let expected = fs::read_to_string(&path)
+        .unwrap_or_default()
+        .replace("\r\n", "\n");
     assert!(
         expected == actual,
         "output no longer matches tests/golden/{name}.\n\
@@ -85,7 +90,8 @@ pub fn assert_golden(name: &str, actual: &str, regenerate: &str) {
 
 /// Writes `contents` to a uniquely named file under the temporary directory and returns its path.
 pub fn scratch_file(name: &str, contents: &str) -> String {
-    let directory = std::env::temp_dir().join(format!("cargo-critpath-tests-{}", std::process::id()));
+    let directory =
+        std::env::temp_dir().join(format!("cargo-critpath-tests-{}", std::process::id()));
     fs::create_dir_all(&directory).unwrap();
     let path = directory.join(name);
     fs::write(&path, contents).unwrap();

@@ -4,6 +4,15 @@
 //! here, and the whole shape is pinned against a golden file so that a change to it fails the build
 //! rather than a consumer's script.
 
+// A test asserting an outcome is allowed to unwrap: a panic is the failure report.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::integer_division,
+    clippy::panic
+)]
+
 mod common;
 
 use serde_json::Value;
@@ -173,7 +182,10 @@ fn the_unit_array_is_emitted_only_when_it_is_asked_for() {
 
     let doc = document(&["--include-units"]);
     let units = array(&doc, "units");
-    assert_eq!(units.len(), integer(doc.get("graph").unwrap(), "units") as usize);
+    assert_eq!(
+        units.len(),
+        integer(doc.get("graph").unwrap(), "units") as usize
+    );
     for (index, unit) in units.iter().enumerate() {
         assert_eq!(integer(unit, "unit"), index as i64);
         let slack = integer(unit, "slack_ms");

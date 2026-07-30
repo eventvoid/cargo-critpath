@@ -4,6 +4,14 @@
 //! project exists to avoid. The golden file pins the whole thing so that a change to it is
 //! deliberate; the tests around it pin the claims that must survive any rewording.
 
+// A test asserting an outcome is allowed to unwrap: a panic is the failure report.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic
+)]
+
 mod common;
 
 use common::{assert_golden, fixture, run, run_workspace};
@@ -68,8 +76,11 @@ fn units_are_ranked_by_contribution_rather_than_by_membership() {
     let run = run_workspace(&[]);
     // mid contributes 520ms and the leaf build-script run 400ms, so mid must come first even
     // though the run enters the path earlier.
-    let mid = run.out.find("520ms").unwrap_or(usize::MAX);
-    let script = run.out.find("400ms").unwrap_or(usize::MAX);
+    let mid = run.out.find("520ms  mid 0.1.0 (lib)").unwrap_or(usize::MAX);
+    let script = run
+        .out
+        .find("400ms  leaf 0.1.0 (build-script (run))")
+        .unwrap_or(usize::MAX);
     assert!(mid < script, "{}", run.out);
     assert!(run.out.contains("contribut"), "{}", run.out);
 }
@@ -107,12 +118,11 @@ fn several_timing_reports_measure_the_spread_and_mark_the_savings_under_it() {
 #[test]
 fn a_build_script_run_is_never_offered_as_something_to_split() {
     let run = run_workspace(&[]);
-    assert!(
-        run.out.contains("cannot be divided"),
-        "the second largest contributor is a build-script run, and the report has to say why it \
-         is not offered rather than leaving it out silently:\n{}",
-        run.out
-    );
+    // The second largest contributor is a build-script run. The transformation refuses to divide
+    // one, so the report must say why rather than leaving a gap in the ranking.
+    let line = line_containing(&run.out, "Not offered");
+    assert!(line.contains("leaf 0.1.0 (build-script (run))"), "{line}");
+    assert!(run.out.contains("indivisible"), "{}", run.out);
 }
 
 #[test]
@@ -132,7 +142,7 @@ fn a_split_is_reported_as_a_range_with_its_assumptions() {
 fn the_executor_scan_leads_with_the_knee_and_qualifies_the_absolute_times() {
     let run = run_workspace(&[]);
     // 2430ms of work over a 1310ms critical path: from two executors on, the path dominates.
-    let knee = line_containing(&run.out, "nee");
+    let knee = line_containing(&run.out, "knee");
     assert!(knee.contains('2'), "{knee}");
     assert!(run.out.contains("optimistic"), "{}", run.out);
     assert!(run.out.contains("pessimistic"), "{}", run.out);

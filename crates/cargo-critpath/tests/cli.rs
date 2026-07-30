@@ -3,6 +3,14 @@
 //! The exit codes are a contract with CI scripts, documented in `docs/json-schema.md`, so each of
 //! the four is pinned by a test rather than left to whichever branch happens to be taken.
 
+// A test asserting an outcome is allowed to unwrap: a panic is the failure report.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic
+)]
+
 mod common;
 
 use common::{fixture, run, run_workspace, scratch_file};

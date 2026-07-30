@@ -1,0 +1,105 @@
+cargo-critpath 0.1.0
+
+build
+  9 units and 2430ms of work, over 9 edges, 1 of them satisfied by metadata
+  dev profile, rustc 1.95.0 (59807616e 2026-04-14), target aarch64-apple-darwin
+  analysed for 4 executors; the build ran with -j 4 and reached a peak of 3 units at once
+  1400ms reported in total, 90ms of it outside the unit model
+    Fetching, resolution and anything else before the first unit started. Reported here rather than
+    folded into the numbers below, which are about compilation only.
+
+bounds
+  critical path          1310ms   holds under every scheduling policy
+  total work / 4          608ms
+  lower bound            1310ms   constraint: graph, the shape of the build is what holds it back
+  simulated makespan     1310ms   an estimate under the cargo-like policy, not a bound
+  mean parallelism         1.85   total work over the simulated makespan
+
+units by contribution to the critical path
+  What each unit adds to the 1310ms. Ranked by contribution rather than by membership of the path,
+  because the head of the path flips between runs of the same build and the contributions do not.
+  They sum to the critical path exactly.
+      520ms  mid 0.1.0 (lib)  [lib]
+      400ms  leaf 0.1.0 (build-script (run))  [build-script-run]
+      150ms  hello-macros 0.1.0 (lib)  [proc-macro]
+      110ms  app 0.1.0 (demo)  [bin]
+       90ms  leaf 0.1.0 (build-script)  [build-script-compile]
+       40ms  leaf 0.1.0 (lib)  [lib]
+
+the critical path, in order
+      enter       exit       adds  unit
+        0ms       90ms       90ms  leaf 0.1.0 (build-script)
+       90ms      490ms      400ms  leaf 0.1.0 (build-script (run))
+      490ms      530ms       40ms  leaf 0.1.0 (lib)
+      530ms      680ms      150ms  hello-macros 0.1.0 (lib)
+      680ms     1200ms      520ms  mid 0.1.0 (lib)
+     1200ms     1310ms      110ms  app 0.1.0 (demo)
+
+what splitting a crate could do
+  A split cannot be modelled exactly, because which half each dependent would need is not knowable
+  without performing it. Each figure below is a range over a sweep of the division fraction from
+  0.25 to 0.75 under both dependent assumptions. At an even division those two assumptions give the
+  same critical path, so what the range is really made of is the sweep over the division. Each half
+  is charged 0ms of per-crate overhead, because nobody has measured what a real split costs and
+  inventing a number would be worse than charging nothing and saying so.
+
+  hello-macros 0.1.0 (lib)
+    critical path     1230ms to 1273ms     against 1310ms as it stands
+    saving              37ms to 80ms
+    makespan          1230ms to 1273ms     estimate, not a bound
+
+  mid 0.1.0 (lib)
+    critical path     1230ms to 1230ms     against 1310ms as it stands
+    saving              80ms to 80ms
+    makespan          1230ms to 1230ms     estimate, not a bound
+    every division in the sweep gives the same critical path, because what the split releases is
+    bounded by something else; a range of zero width here is a degeneracy rather than extra
+    confidence in the number
+
+  app 0.1.0 (demo)
+    critical path     1255ms to 1283ms     against 1310ms as it stands
+    saving              27ms to 55ms
+    makespan          1255ms to 1283ms     estimate, not a bound
+
+  leaf 0.1.0 (lib)
+    critical path     1280ms to 1300ms     against 1310ms as it stands
+    saving              10ms to 30ms
+    makespan          1280ms to 1300ms     estimate, not a bound
+
+  Not offered: leaf 0.1.0 (build-script (run)) adds 400ms to the critical path, but one execution of
+  one program is a single indivisible step, so there is no split of it to model.
+  Not offered: leaf 0.1.0 (build-script) adds 90ms to the critical path, but Cargo generates a build
+  script's compilation from the script itself, so dividing it is not a change to this graph that a
+  workspace could make.
+
+noise floor
+  Only one timing report was supplied, so the run-to-run spread is unknown.
+  No saving above can be checked against it, and this tool will not invent a threshold. Pass
+  --timings once per clean build to measure it. On four real projects the spread ran from 2.3% to
+  11.8% of the critical path, which is wide enough to swallow a recommendation whole.
+
+executors
+  The knee is at 2 executors: from there on the critical path dominates.
+  Beyond the knee, total work divided between the executors falls under the critical path, so more
+  of them cannot shorten this build. The knee is decided by the critical path and by total work,
+  neither of which depends on the executor count, so it survives the weight error below. An absolute
+  time does not.
+
+     J   work / J  lower bound   simulated   constraint  reliability
+     1     2430ms       2430ms      2430ms   machine     pessimistic
+     2     1215ms       1310ms      1310ms   graph       knee, pessimistic
+     4      608ms       1310ms      1310ms   graph       weights measured here
+     8      304ms       1310ms      1310ms   graph       optimistic
+    16      152ms       1310ms      1310ms   graph       optimistic
+
+  The per-unit weights come from one build at -j 4 and are not invariant to it. Measured on two real
+  projects, total unit work fell 23% to 30% between ten executors and two. Rows above -j 4 are
+  therefore optimistic and rows below it pessimistic, by an amount this tool cannot correct for.
+  The simulated column is not monotone in the executor count. Adding an executor can lengthen a
+  greedy schedule, so a row longer than the one above it is a property of list scheduling and not an
+  error.
+
+notes
+  warning [noise-floor-unknown] only one timing report was supplied, so the run-to-run spread could
+  not be measured and no saving can be checked against it; supply --timings once per clean build to
+  measure it

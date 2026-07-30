@@ -10,8 +10,13 @@ categories.workspace = true
 keywords.workspace = true
 readme = "README.md"
 
+[[bin]]
+name = "cargo-critpath"
+path = "src/main.rs"
+
 [dependencies]
 critpath-core.workspace = true
+lexopt.workspace = true
 serde_json.workspace = true
 
 [lints]
