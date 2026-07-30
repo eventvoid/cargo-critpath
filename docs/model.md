@@ -355,11 +355,34 @@ and which dependents need which half.
 - The dependents are bounded rather than guessed:
   - **Optimistic bound** — each dependent needs exactly one half. The best a split could do.
   - **Pessimistic bound** — every dependent still needs both halves. The split buys nothing
-    structurally, and only the pipelining boundary moves.
+    structurally, though it can still shorten the critical path, because both halves emit metadata
+    earlier than the undivided unit did. "Buys nothing structurally" is not "saves nothing".
 
 A split is also not free: two crates re-parse shared imports and each pays a fixed per-crate
 cost. A per-unit overhead is added to each half, and it is a declared parameter rather than a
-hidden constant.
+hidden constant. It defaults to zero, because nobody has measured what a real split costs and
+inventing a number would be worse than charging nothing and saying so.
+
+Details the implementation must not have to guess at:
+
+- **The halves sum to the original exactly.** `total(U_a) = scaled(total(U), f)` and
+  `total(U_b) = total(U) - total(U_a)`. Computing both by scaling would not sum to the original in
+  integer arithmetic: 999 split evenly would give 500 and 500, inventing a millisecond.
+- **`metadata_at` scales by the same share as its half's total**, and is clamped so it can never
+  exceed it. The clamp is reachable through rounding alone.
+- **The overhead is added to `total` but not to `metadata_at`, and that has a direction.** A fixed
+  per-crate cost is mostly front-loaded — parsing, macro expansion, name resolution — so it falls
+  before metadata is emitted. Leaving `metadata_at` alone therefore releases dependents earlier than
+  is plausible, which **overstates the saving**. This is the optimistic reading and it is stated
+  rather than hidden.
+- **The optimistic bound is a bound, not a shape anyone would write.** Every dependent attaches to
+  whichever half finishes first, which is what makes it the best a split could achieve. The other
+  half ends up with no dependents at all. Output must not present it as what the refactored code
+  would look like.
+- **`f = 0` and `f = 1` are permitted** and still charge the overhead to an empty half. A sweep
+  should exclude the endpoints, which is the caller's decision rather than the core's.
+- Identifiers are **renumbered**: a transformed graph does not reuse the original's identifiers, so
+  every before-and-after comparison goes through the mapping the transformation returns.
 
 **The dependent bounds are often degenerate, and saying otherwise would overstate what they
 bracket.** At `f = 1/2` the two halves finish at the same instant, so which dependents attach to
@@ -380,14 +403,19 @@ interval that hides the variable that matters.
 
 ### 9.2 Break a dependency edge
 
-Remove the edge and recompute. The `CP` change is monotone and anchors the answer; the simulated
+Remove the edge and recompute. **Nothing is pruned**: the producer still exists and still
+contributes its weight to total work, even if nothing depends on it any more. The opposite reading
+is defensible and gives different numbers, so it is stated rather than left to the reader. The `CP` change is monotone and anchors the answer; the simulated
 makespan change is reported alongside it, with the section 7 anomaly disclosed if it moves the
 wrong way.
 
 ### 9.3 Drop a dependency or a feature
 
-Remove the target package's units, then remove every unit that is no longer reachable from the
-build's roots, and recompute. This is the one transformation whose *structure* is exact: the
+Remove the target package's units, then remove every unit that can no longer reach a surviving
+root, and recompute. A **root is a unit that had no dependents in the original graph**, and the set
+is fixed before anything is removed rather than recomputed afterwards. Recomputing would promote
+every orphaned unit into a root, nothing would ever be pruned, and the transformation would quietly
+degenerate into "remove exactly the named units". This is the one transformation whose *structure* is exact: the
 graph after dropping a dependency really is known. The weights of surviving units may still
 shift if the feature change alters what they compile, and that caveat is reported.
 

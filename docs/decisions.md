@@ -238,7 +238,10 @@ the two bounds coincide exactly:
     async-graphql  split async_graphql  (6870ms)  saving 3395ms under both assumptions
 
 An interval whose two ends are equal is not an interval, and printing one implies a robustness the
-number does not have. The variable that actually drives the answer is `f`, and `f` is precisely
+number does not have. To be precise about which number coincides: the two assumptions give the same
+**critical path**. They need not give the same simulated makespan, because the pessimistic graph has
+twice the outgoing edges and the `cargo-like` priority counts transitive reverse-dependents, so the
+two halves are ordered differently. The variable that actually drives the answer is `f`, and `f` is precisely
 what cannot be known before performing the split.
 
 **Rejected: keeping only the optimistic/pessimistic pair.** It is honest about a real unknown that
