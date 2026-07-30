@@ -344,8 +344,9 @@ pub fn roots(graph: &BuildGraph) -> Vec<UnitId> {
 
 /// Applies `transform` to `graph`, leaving `graph` untouched.
 ///
-/// Each transformation copies the graph once and visits every unit and edge a constant number of
-/// times, so applying one costs `O(V + E)` plus the cost of validating the result.
+/// Each transformation copies the graph once, visiting every unit and edge a constant number of
+/// times. Handing the edges to [`GraphBuilder`] puts each one into an ordered map, so the cost is
+/// `O(V + E log E)`, of which validating the result is `O(V + E)`.
 ///
 /// # Errors
 ///
