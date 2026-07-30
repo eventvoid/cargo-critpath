@@ -151,8 +151,13 @@ section 3. It depends only on the graph and the weights — not on the executor 
 any scheduling policy. That is why it is the number the tool leads with.
 
 The **critical path** is the chain recovered by tracing back from the unit attaining `CP`,
-following at each step the incoming edge that determined `est`, until a unit with no
-dependencies is reached.
+following at each step whatever determined `est`, until a unit with no dependencies is reached.
+
+For an ordinary unit that is the incoming edge attaining the maximum. For a unit with
+`requires_full_closure` it is the unit in its closure with the greatest `eft`, **which need not be a
+direct dependency and need not be joined to it by any edge at all**. So consecutive units on a
+reported critical path are joined by an edge or by a closure requirement, and a consumer of this
+path must not assume the former.
 
 A `Metadata` edge lets a path traverse a unit contributing only `metadata_at` rather than its
 full `total`. Defining `CP` in terms of `release` rather than `total` is what keeps the critical
@@ -166,7 +171,11 @@ Parameter `J >= 1`, the number of executors.
 The simulator is a non-preemptive list scheduler:
 
 1. Time starts at 0, all units unstarted.
-2. A unit is **ready** at time `t` when every incoming edge has `release(e) <= t`.
+2. A unit is **ready** at time `t` when every incoming edge has `release(e) <= t`, and — for a unit
+   with `requires_full_closure` — when every unit in its transitive dependency closure has finished.
+   The closure requirement of section 3.1 applies to the bounded simulation exactly as it applies to
+   the critical path. Omitting it here would let a linking unit start before its closure was built,
+   which would put the makespan below `CP` and break I5.
 3. While an executor is free and a ready unit exists, the highest-priority ready unit starts.
 4. A started unit occupies exactly one executor for exactly `total`, without preemption or
    migration.
@@ -222,7 +231,9 @@ dependence on hash iteration order.
 **I2 — Precedence respected.** For every edge `e = (D -> U)` in a produced schedule,
 `start(U) >= release(e)`.
 
-**I3 — Capacity respected.** At no instant are more than `J` units running.
+**I3 — Capacity respected.** At no instant are more than `J` units running. A unit of zero duration
+occupies the half-open interval `[start, start)`, which contains no instant, so it cannot contribute
+to a capacity violation.
 
 **I4 — Non-preemption.** Each unit occupies one executor over exactly
 `[start(U), start(U) + total(U))`.
