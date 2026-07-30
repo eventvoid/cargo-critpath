@@ -7,9 +7,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.74.0"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/cargo-critpath/cargo-critpath"
-categories = ["development-tools::cargo-plugins", "development-tools::profiling"]
-keywords = ["cargo", "build-time", "critical-path", "scheduling"]
+repository = "https://github.com/eventvoid/cargo-critpath"
 
 [workspace.dependencies]
 critpath-core = { version = "0.1.0", path = "crates/critpath-core" }

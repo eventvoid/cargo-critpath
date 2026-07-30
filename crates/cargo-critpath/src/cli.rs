@@ -73,7 +73,8 @@ OPTIONS
                         workspace-local source path to its package exactly rather than by
                         directory name
     --jobs <n>          how many executors to analyse for. Defaults to the -j the build ran with
-    --format <f>        human (default) or json. The JSON contract is in docs/json-schema.md
+    --format <f>        human (default) or json. The JSON contract is documented at
+                        https://github.com/eventvoid/cargo-critpath/blob/main/docs/json-schema.md
     --policy <p>        cargo-like (default), which reproduces Cargo's cost-blind ordering, or
                         longest-path, which schedules better than Cargo does. The gap between
                         them is what Cargo's ordering alone costs

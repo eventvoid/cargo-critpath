@@ -6,9 +6,10 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-categories.workspace = true
-keywords.workspace = true
+categories = ["development-tools::profiling", "development-tools::build-utils"]
+keywords = ["build-time", "critical-path", "scheduling", "dag"]
 readme = "README.md"
+documentation = "https://docs.rs/critpath-core"
 
 [dependencies]
 

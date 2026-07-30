@@ -1,4 +1,4 @@
-//! The machine-readable document, against the contract in `docs/json-schema.md`.
+//! The machine-readable document, against the contract in [`docs/json-schema.md`](https://github.com/eventvoid/cargo-critpath/blob/main/docs/json-schema.md).
 //!
 //! The document is written out field by field rather than serialised from a map, for two reasons.
 //! The contract fixes the order of every array, and a `serde_json` object is a sorted map whose key

@@ -7,7 +7,7 @@
 //! Using it for a build system other than Cargo means writing an adapter that produces a
 //! [`BuildGraph`]; nothing in here has to change.
 //!
-//! The model, its invariants, and its known systematic errors are documented in `docs/model.md`
+//! The model, its invariants, and its known systematic errors are documented in [`docs/model.md`](https://github.com/eventvoid/cargo-critpath/blob/main/docs/model.md)
 //! in the repository.
 
 #![forbid(unsafe_code)]
