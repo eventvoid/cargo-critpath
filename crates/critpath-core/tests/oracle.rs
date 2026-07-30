@@ -1004,7 +1004,7 @@ fn simulated_makespan_is_never_below_the_bounds() {
                     case.describe()
                 );
                 assert_eq!(
-                    lower_bound(&case.graph, &analysis, nz_executors).get(),
+                    lower_bound(&analysis, nz_executors).get(),
                     critical.max(area),
                     "{}: lower bound on {executors}",
                     case.describe()

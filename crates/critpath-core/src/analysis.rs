@@ -9,8 +9,9 @@ use crate::millis::Millis;
 
 /// Earliest and latest times for every unit of one graph, and the critical path through it.
 ///
-/// Produced by [`analyze`]. Identifiers from a different graph read as `None` rather than as some
-/// other unit's numbers.
+/// Produced by [`analyze`]. An identifier from a different graph is not detected: identifiers are
+/// dense indices, so a foreign one reads as `None` only when it points past the end, and otherwise
+/// returns another unit's numbers. Do not mix identifiers between graphs.
 ///
 /// ```
 /// use critpath_core::{analyze, EdgeKind, GraphBuilder, Millis, Unit, UnitKind};
@@ -53,6 +54,7 @@ pub struct Analysis {
     contribution: Vec<Option<Millis>>,
     path: Vec<UnitId>,
     critical_path_len: Millis,
+    total_work: Millis,
 }
 
 /// The constraint that decided a unit's earliest start, and which unit imposed it.
@@ -89,20 +91,30 @@ impl Analysis {
         &self.path
     }
 
-    /// The earliest a unit could start, or `None` for an identifier from another graph.
+    /// The total work the analysed graph holds: the sum of every unit's duration.
+    #[must_use]
+    pub fn total_work(&self) -> Millis {
+        self.total_work
+    }
+
+    /// The earliest a unit could start, or `None` if the index is outside this analysis.
+    ///
+    /// An identifier belonging to a different graph is not detected. Identifiers are dense
+    /// indices, so a foreign one reads as `None` only when it happens to point past the end, and
+    /// otherwise names a different unit. Do not mix identifiers between graphs.
     #[must_use]
     pub fn earliest_start(&self, id: UnitId) -> Option<Millis> {
         self.earliest_start.get(id.index()).copied()
     }
 
-    /// The earliest a unit could finish, or `None` for an identifier from another graph.
+    /// The earliest a unit could finish, or `None` if the index is outside this analysis.
     #[must_use]
     pub fn earliest_finish(&self, id: UnitId) -> Option<Millis> {
         self.earliest_finish.get(id.index()).copied()
     }
 
-    /// The latest a unit may finish without lengthening the critical path, or `None` for an
-    /// identifier from another graph.
+    /// The latest a unit may finish without lengthening the critical path, or `None` if the index is
+    /// outside this analysis.
     #[must_use]
     pub fn latest_finish(&self, id: UnitId) -> Option<Millis> {
         self.latest_finish.get(id.index()).copied()
@@ -168,6 +180,7 @@ pub fn analyze(graph: &BuildGraph) -> Analysis {
         contribution,
         path,
         critical_path_len,
+        total_work: graph.total_work(),
     }
 }
 

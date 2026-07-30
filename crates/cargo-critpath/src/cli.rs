@@ -22,6 +22,7 @@ use crate::{json, parse_with_metadata, report, ParseError};
 /// The codes are a contract with CI scripts: a threshold that was exceeded has to be
 /// distinguishable from a tool that could not run, or the script has to parse prose.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Outcome {
     /// The analysis ran and every threshold was met.
     Completed,

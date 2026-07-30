@@ -9,6 +9,7 @@ use critpath_core::GraphError;
 /// A unit that could not be matched has to be described from whichever side saw it, so the fields
 /// that side does not know are empty rather than invented.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
 pub struct UnitDescription {
     /// Package name, where it is known.
     pub package: String,
