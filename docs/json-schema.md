@@ -1,8 +1,9 @@
 # Machine-readable output
 
-`cargo critpath --format json` writes one JSON object to stdout. This document is the contract.
-A test in `crates/cargo-critpath/tests/` pins the shape against a fixture, so an accidental change
-to the schema fails the build rather than a consumer's script.
+`cargo critpath --format json` writes one JSON object to stdout. This document is the contract, and
+it is normative: where the implementation and this document disagree, the implementation is wrong.
+The shape is required to be pinned against a fixture by a test, so that an accidental change fails
+the build rather than a consumer's script.
 
 ## Versioning
 
@@ -85,7 +86,7 @@ The analysis of the graph as it is.
 | `area_bound_ms` | integer | `total_work_ms / executors`, rounded up |
 | `lower_bound_ms` | integer | `max(critical_path_ms, area_bound_ms)` |
 | `simulated_makespan_ms` | integer | the list-scheduler estimate |
-| `policy` | string | the simulator's priority rule, currently `longest-remaining-path` |
+| `policy` | string | the simulator's priority rule: `cargo-like` (the default, reproducing Cargo's cost-blind ordering) or `longest-path` |
 | `constraint` | string | `graph` when `critical_path_ms >= area_bound_ms`, else `machine` |
 | `mean_parallelism` | number | `total_work_ms / simulated_makespan_ms`, to two decimals |
 
@@ -104,18 +105,18 @@ An ordered array, from a unit with no dependencies to the unit that attains `CP`
   "unit": 12,
   "label": { "package": "syn", "version": "2.0.90", "target": "lib" },
   "kind": "lib",
-  "enter_ms": 1020,
-  "exit_ms": 3330,
-  "contribution_ms": 1830,
-  "incoming_edge_kind": "metadata",
-  "total_ms": 2310,
-  "metadata_at_ms": 1830
+  "enter_ms": 0,
+  "exit_ms": 2570,
+  "contribution_ms": 1430,
+  "incoming_edge_kind": null,
+  "total_ms": 2570,
+  "metadata_at_ms": 1430
 }
 ```
 
 `contribution_ms` is what this unit adds to `CP`: `metadata_at_ms` when the *outgoing* edge along
 the path is a metadata edge, and `total_ms` when it is a full edge or the unit is last. The
-contributions sum to `critical_path_ms`, and a test asserts that.
+contributions are required to sum to `critical_path_ms`.
 
 `incoming_edge_kind` is `metadata`, `full`, or `null` for the first element.
 
@@ -132,11 +133,11 @@ workspace it is far larger than the rest of the document.
   "unit": 12,
   "label": { "package": "syn", "version": "2.0.90", "target": "lib" },
   "kind": "lib",
-  "total_ms": 2310,
-  "metadata_at_ms": 1830,
-  "earliest_start_ms": 1020,
-  "earliest_finish_ms": 3330,
-  "latest_finish_ms": 3330,
+  "total_ms": 2570,
+  "metadata_at_ms": 1430,
+  "earliest_start_ms": 0,
+  "earliest_finish_ms": 2570,
+  "latest_finish_ms": 2570,
   "slack_ms": 0,
   "on_critical_path": true,
   "dependencies": 4,
@@ -157,9 +158,12 @@ One entry per counterfactual. All of them share this envelope:
   "kind": "split-crate",
   "target": { "package": "syn", "version": "2.0.90", "target": "lib" },
   "exact": false,
+  "fraction_swept": { "low": 0.25, "high": 0.75 },
+  "overhead_ms": 0,
   "assumptions": [
-    "work divides evenly between the two halves",
-    "each half pays 40ms of fixed per-crate overhead"
+    "the division of work between the halves is swept from 0.25 to 0.75; no single division is assumed",
+    "each half pays the per-crate overhead given by overhead_ms, which defaults to zero because no measurement of it exists",
+    "dependent assignment: optimistic and pessimistic bounds coincide at an even division"
   ],
   "critical_path_ms": { "low": 3100, "high": 4200 },
   "saving_ms": { "low": 0, "high": 1100 },
@@ -174,6 +178,8 @@ One entry per counterfactual. All of them share this envelope:
 | `kind` | string | `split-crate`, `remove-edge`, `drop-dependency`, `drop-feature`, `set-executors` |
 | `target` | object or null | what the scenario acts on; shape depends on `kind` |
 | `exact` | boolean | `true` only when the resulting graph is genuinely known, which is the case for `drop-dependency`, `drop-feature` and `remove-edge`, and never for `split-crate` |
+| `fraction_swept` | object or null | for `split-crate`, the range of work divisions the interval spans. Null for other kinds |
+| `overhead_ms` | integer or null | the fixed per-crate cost charged to each half of a split. Defaults to 0: no measurement of this quantity exists, so the tool does not invent one, and a caller who has measured it can supply it |
 | `assumptions` | array of string | every assumption the numbers rest on, in prose. Never empty when `exact` is `false` |
 | `critical_path_ms` | interval | `CP` after the change |
 | `saving_ms` | interval | baseline `critical_path_ms` minus the scenario's. May be negative |
@@ -194,7 +200,10 @@ Machine-readable warnings and refusals. Empty array when there are none.
 
 ```json
 { "severity": "warning", "code": "saving-below-noise-floor",
-  "message": "estimated saving of 40ms is smaller than the 120ms run-to-run spread measured for this build" }
+  "message": "estimated saving of 300ms is smaller than the 400ms run-to-run spread measured across the supplied timing reports" }
+
+{ "severity": "warning", "code": "noise-floor-unknown",
+  "message": "only one timing report was supplied, so the run-to-run spread could not be measured and no saving can be checked against it" }
 ```
 
 `severity` is `warning` or `error`. `code` is a stable kebab-case identifier and is the field to
