@@ -1359,15 +1359,15 @@ fn the_longest_path_policy_has_the_anomaly_too() {
     replay(&graph, &three, 3, "three executors");
 }
 
-/// How often the anomaly bites, across the whole corpus.
+/// How often an extra executor costs time, across the whole corpus.
 ///
-/// This is the general form of I8, and it fails; the two tests above hold its minimal
-/// counterexamples. It is left runnable rather than deleted so that the extent of the
-/// disagreement can be measured after any change to the scheduler:
-/// `cargo test -p critpath-core --test oracle -- --ignored`.
+/// Adding an executor can lengthen a greedy schedule; `docs/model.md` records it among the
+/// anomalies that are deliberately not invariants, and the two tests above hold its minimal
+/// counterexamples. This one measures how often it happens, so that a change to the scheduler
+/// which made it common, or which made it stop happening at all, would be noticed rather than
+/// quietly absorbed.
 #[test]
-#[ignore = "I8 as written is false; see an_extra_executor_can_lengthen_the_simulated_build"]
-fn makespan_does_not_grow_with_more_executors() {
+fn an_extra_executor_costs_time_rarely_but_measurably() {
     let cases = corpus(&wide_shapes(), 45, 0x5eed_0008);
     let mut violations = Vec::new();
     let mut compared = 0usize;
@@ -1393,10 +1393,23 @@ fn makespan_does_not_grow_with_more_executors() {
         }
     }
 
+    // The anomaly is real, so an empty result would mean the corpus had stopped reaching it or the
+    // scheduler had stopped being greedy. Both are worth failing for.
     assert!(
-        violations.is_empty(),
-        "the makespan grew with an extra executor in {} of {compared} comparisons:\n{}",
+        !violations.is_empty(),
+        "no extra executor cost time in {compared} comparisons; \
+         either the corpus no longer reaches the anomaly or the scheduler is no longer greedy"
+    );
+    // It is rare. If it became common the simulated makespan would be far less useful than the
+    // bounds beside it, and the executor scan would need rethinking rather than a footnote.
+    let rate = violations.len() * 1000 / compared.max(1);
+    assert!(
+        rate < 50,
+        "an extra executor cost time in {} of {compared} comparisons, which is {}.{}% \
+         and far above the rate this corpus has shown before:\n{}",
         violations.len(),
+        rate / 10,
+        rate % 10,
         violations.join("\n")
     );
 }
