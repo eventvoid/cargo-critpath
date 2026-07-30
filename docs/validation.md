@@ -139,7 +139,7 @@ Three clean builds of the same commit at `-j 10`:
 | ripgrep | yes | 5800 / 5970 / 5570 ms | 400 ms (6.9%) |
 | async-graphql | no, 2 of 3 | 18160 / 16520 / 18030 ms | 1640 ms (9.1%) |
 | rust-analyzer | no, 2 of 3 | 58580 / 58470 / 57260 ms | 1320 ms (2.3%) |
-| bevy | see below | 164540 / 146650 / 151510 ms | 17890 ms (11.8%) |
+| bevy | yes | 164540 / 146650 / 151510 ms | 17890 ms (11.8%) |
 
 The disagreements are entirely in the **head** of the path, and only between interchangeable
 build-script chains. One async-graphql run began with `proc-macro2`'s build-script chain where the
@@ -156,7 +156,37 @@ second 147960 ms, a difference far larger than any saving the tool would report 
 First runs after a `cargo clean` appear to be systematically slower, so a single measurement of a
 large project should not be trusted.
 
-## Result 6: some recommendations fall below the noise floor
+## Result 6: which parts of the model earn their place
+
+The model has two refinements over a naive longest-path computation. They are not worth the same.
+
+Recomputing the critical path with every metadata edge treated as a full edge — that is, ignoring
+pipelining entirely:
+
+| project | critical path | ignoring pipelining | overstatement |
+| --- | --- | --- | --- |
+| ripgrep | 5800 ms | 8090 ms | 28.3% |
+| async-graphql | 18160 ms | 18530 ms | 2.0% |
+| rust-analyzer | 58580 ms | 85620 ms | 31.6% |
+| bevy | 164540 ms | 215500 ms | 23.6% |
+
+Recomputing it with the closure requirement of [model.md](model.md) section 3.1 cleared on every
+unit:
+
+| project | critical path | ignoring the closure rule | difference |
+| --- | --- | --- | --- |
+| ripgrep | 5800 ms | 5800 ms | 0 ms |
+| async-graphql | 18160 ms | 18160 ms | 0 ms |
+| rust-analyzer | 58580 ms | 58580 ms | 0 ms |
+| bevy | 164540 ms | 164540 ms | 0 ms |
+
+So pipelining is load-bearing and the closure rule, on these four projects, is not. The 30% figure
+quoted for the closure rule elsewhere comes from a fixture constructed to exhibit it, and that
+distinction is now made wherever the rule is described. The rule stays because it is what Cargo
+does and it can bind on graphs these four do not cover, but nobody should believe it is what makes
+the tool accurate.
+
+## Result 7: some recommendations fall below the noise floor
 
 Splitting `regex-automata`, the heaviest unit on ripgrep's critical path, was estimated to save
 **300 ms** — inside ripgrep's own 400 ms run-to-run spread. That recommendation is indistinguishable
