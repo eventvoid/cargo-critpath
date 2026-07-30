@@ -181,7 +181,20 @@ fn commands(text: &str) -> Vec<String> {
     out
 }
 
-/// Splits a command the way a POSIX shell would, which is how Cargo quoted it.
+/// Splits a command into arguments, undoing exactly the escaping Cargo applied.
+///
+/// Cargo renders each argument through one escaper, and which one depends on the platform the log
+/// was captured on rather than the one reading it. Both have to be undone, and the two disagree
+/// about backslashes, so neither "a backslash escapes the next character" nor "a backslash is
+/// literal" is right on its own:
+///
+/// - The Unix escaper wraps the argument in single quotes, and renders `'` as `'\''` and `!` as
+///   `'\!'` — closing the quotes, escaping the character, reopening. So outside quotes a backslash
+///   is meaningful, but only ever before one of those two characters.
+/// - The Windows escaper wraps the argument in double quotes and doubles a backslash only where it
+///   precedes a quote. So inside quotes a lone backslash is a path separator, not an escape.
+///
+/// Anything else is a literal backslash, which is what every path separator in a Windows log is.
 ///
 /// Returns `None` if a quote is left open, because the alternative is to invent arguments.
 fn split_command(command: &str) -> Option<Vec<String>> {
@@ -213,8 +226,14 @@ fn split_command(command: &str) -> Option<Vec<String>> {
                 loop {
                     match chars.next() {
                         Some('"') => break,
+                        // Only a quote or another backslash was escaped. Anything else is a
+                        // separator in a Windows path and both characters are kept.
                         Some('\\') => match chars.next() {
-                            Some(escaped) => current.push(escaped),
+                            Some(escaped @ ('"' | '\\')) => current.push(escaped),
+                            Some(literal) => {
+                                current.push('\\');
+                                current.push(literal);
+                            }
                             None => return None,
                         },
                         Some(inner) => current.push(inner),
@@ -222,10 +241,16 @@ fn split_command(command: &str) -> Option<Vec<String>> {
                     }
                 }
             }
+            // Outside quotes only an apostrophe or an exclamation mark is ever escaped, those being
+            // the two characters the Unix escaper closes the quotes around.
             '\\' => {
                 started = true;
                 match chars.next() {
-                    Some(escaped) => current.push(escaped),
+                    Some(escaped @ ('\'' | '!')) => current.push(escaped),
+                    Some(literal) => {
+                        current.push('\\');
+                        current.push(literal);
+                    }
                     None => return None,
                 }
             }

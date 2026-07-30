@@ -220,3 +220,207 @@ fn an_unrecognised_running_line_is_kept_rather_than_dropped() {
     assert_eq!(parsed.unrecognised.len(), 1);
     assert!(parsed.unrecognised[0].contains("rustdoc"));
 }
+
+/// A log captured on Windows, read on whatever platform the tests run on.
+///
+/// Drive letters, backslash separators, `.exe` on both the compiler and the build-script
+/// executable, `.dll` for a proc-macro, and CRLF line endings. A fixture committed from one
+/// platform is read on all three, so none of this can depend on the host.
+fn windows_log() -> String {
+    let text = "   Compiling unicode-ident v1.0.20\n\
+         Running `C:\\tc\\bin\\rustc.exe --crate-name unicode_ident --edition=2021 \
+         C:\\reg\\index.crates.io-1949cf8c6b5b557f\\unicode-ident-1.0.20\\src\\lib.rs \
+         --crate-type lib --emit=dep-info,metadata,link -C metadata=aaaa0000aaaa0000 \
+         -C extra-filename=-1111111111111111 --out-dir C:\\ws\\target\\debug\\deps`\n\
+         Running `C:\\tc\\bin\\rustc.exe --crate-name build_script_build --edition=2021 \
+         C:\\reg\\index.crates.io-1949cf8c6b5b557f\\libc-0.2.186\\build.rs --crate-type bin \
+         --emit=dep-info,link -C metadata=bbbb0000bbbb0000 \
+         -C extra-filename=-2222222222222222 \
+         --out-dir C:\\ws\\target\\debug\\build\\libc-2222222222222222`\n\
+         Running `C:\\ws\\target\\debug\\build\\libc-2222222222222222\\build-script-build.exe`\n\
+         Running `C:\\tc\\bin\\rustc.exe --crate-name syn --edition=2021 \
+         C:\\reg\\index.crates.io-1949cf8c6b5b557f\\syn-2.0.90\\src\\lib.rs --crate-type lib \
+         --emit=dep-info,metadata,link -C metadata=cccc0000cccc0000 \
+         -C extra-filename=-3333333333333333 --out-dir C:\\ws\\target\\debug\\deps \
+         --extern unicode_ident=C:\\ws\\target\\debug\\deps\\\
+         libunicode_ident-1111111111111111.rmeta`\n\
+         Running `C:\\tc\\bin\\rustc.exe --crate-name serde_derive --edition=2021 \
+         C:\\reg\\index.crates.io-1949cf8c6b5b557f\\serde_derive-1.0.228\\src\\lib.rs \
+         --crate-type proc-macro --emit=dep-info,link -C metadata=dddd0000dddd0000 \
+         -C extra-filename=-4444444444444444 --out-dir C:\\ws\\target\\debug\\deps \
+         --extern syn=C:\\ws\\target\\debug\\deps\\libsyn-3333333333333333.rlib`\n\
+         Running `C:\\tc\\bin\\rustc.exe --crate-name demo --edition=2021 src\\main.rs \
+         --crate-type bin --emit=dep-info,link -C metadata=eeee0000eeee0000 \
+         -C extra-filename=-5555555555555555 --out-dir C:\\ws\\target\\debug\\deps \
+         --extern serde_derive=C:\\ws\\target\\debug\\deps\\\
+         serde_derive-4444444444444444.dll`\n";
+    text.replace('\n', "\r\n")
+}
+
+#[test]
+fn a_log_captured_on_windows_parses_the_same_as_one_from_a_unix_host() {
+    let parsed = cargo_critpath::parse_verbose_log(&windows_log()).unwrap();
+
+    // Six `Running` lines, one of them the build-script execution.
+    let roles: Vec<Role> = parsed.invocations.iter().map(|i| i.role).collect();
+    assert_eq!(
+        roles,
+        vec![
+            Role::Compile,
+            Role::Compile,
+            Role::BuildScriptRun,
+            Role::Compile,
+            Role::Compile,
+            Role::Compile,
+        ],
+        "the build-script executable ends in .exe on Windows and must still be recognised"
+    );
+
+    // The package of a build script is read off its --out-dir, which is backslash-separated here.
+    let script = parsed
+        .invocations
+        .iter()
+        .find(|i| i.role == Role::BuildScriptRun)
+        .unwrap();
+    assert_eq!(script.run_package.as_deref(), Some("libc"));
+    assert_eq!(script.run_artifact.as_deref(), Some("-2222222222222222"));
+
+    // A registry source path with backslashes still yields the package name and version.
+    let syn = parsed
+        .invocations
+        .iter()
+        .find(|i| i.crate_name == "syn")
+        .unwrap();
+    let syn_package = syn.registry_package.as_ref().unwrap();
+    assert_eq!(syn_package.name, "syn");
+    assert_eq!(syn_package.version, "2.0.90");
+
+    // Only `.rmeta` is a metadata edge. Windows names a proc-macro `.dll` where a Unix host says
+    // `.so` or `.dylib`, and all three have to come out as full edges.
+    assert_eq!(syn.externs[0].edge, EdgeKind::Metadata);
+    assert_eq!(
+        syn.externs[0].producer.as_deref(),
+        Some("-1111111111111111")
+    );
+
+    let demo = parsed
+        .invocations
+        .iter()
+        .find(|i| i.crate_name == "demo")
+        .unwrap();
+    assert_eq!(demo.kind, UnitKind::Bin);
+    assert_eq!(demo.externs.len(), 1);
+    assert_eq!(
+        demo.externs[0].edge,
+        EdgeKind::Full,
+        "a .dll proc-macro is a full edge, exactly as .dylib and .so are"
+    );
+    assert_eq!(
+        demo.externs[0].producer.as_deref(),
+        Some("-4444444444444444"),
+        "the producer hash must be recovered from a backslash-separated path"
+    );
+
+    let derive = parsed
+        .invocations
+        .iter()
+        .find(|i| i.crate_name == "serde_derive")
+        .unwrap();
+    assert_eq!(derive.kind, UnitKind::ProcMacro);
+    assert!(!derive.pipelined);
+}
+
+/// A Unix path containing characters Cargo's escaper singles out.
+///
+/// Cargo renders each argument through the same escaper the shell crate provides. On Unix that wraps
+/// the argument in single quotes and renders an apostrophe as `'\''` and an exclamation mark as
+/// `'\!'` — a backslash **outside** the quotes, closing and reopening around it. Losing that escape
+/// inverts quote parity for the rest of the line, so the argument stops being one argument.
+#[test]
+fn a_quote_escaped_unix_path_stays_one_argument() {
+    let text = "   Compiling demo v0.1.0\n\
+         Running `/tc/bin/rustc --crate-name demo --edition=2021 src/main.rs --crate-type bin \
+         --emit=dep-info,link -C metadata=eeee0000eeee0000 \
+         -C extra-filename=-5555555555555555 --out-dir /ws/target/debug/deps \
+         --extern 'dep=/ws/o'\\''brien '\\!'dir/target/debug/deps/\
+         libdep-1111111111111111.rmeta'`\n";
+    let parsed = cargo_critpath::parse_verbose_log(text).unwrap();
+
+    assert_eq!(parsed.invocations.len(), 1);
+    let demo = &parsed.invocations[0];
+    assert_eq!(demo.crate_name, "demo");
+    assert_eq!(
+        demo.externs.len(),
+        1,
+        "the escaped apostrophe and exclamation mark must not split the argument"
+    );
+    assert_eq!(demo.externs[0].name, "dep");
+    assert_eq!(demo.externs[0].edge, EdgeKind::Metadata);
+    assert_eq!(
+        demo.externs[0].producer.as_deref(),
+        Some("-1111111111111111"),
+        "the producer hash must survive a path holding an apostrophe and an exclamation mark"
+    );
+}
+
+/// A Windows path with a space, which Cargo wraps in double quotes.
+///
+/// The Windows escaper doubles a backslash only where it precedes a quote, so inside the quotes a
+/// lone separator is literal. Consuming it as an escape loses every separator in the path, and with
+/// it the package a build script belongs to and the package a registry path names.
+#[test]
+fn a_quoted_windows_path_keeps_its_separators() {
+    let text = "   Compiling libc v0.2.186\n\
+         Running `\"C:\\tc\\bin\\rustc.exe\" --crate-name build_script_build --edition=2021 \
+         \"C:\\Users\\John Doe\\reg\\libc-0.2.186\\build.rs\" --crate-type bin \
+         --emit=dep-info,link -C metadata=bbbb0000bbbb0000 \
+         -C extra-filename=-2222222222222222 \
+         --out-dir \"C:\\Users\\John Doe\\ws\\target\\debug\\build\\libc-2222222222222222\"`\n\
+         Running `\"C:\\Users\\John Doe\\ws\\target\\debug\\build\\\
+         libc-2222222222222222\\build-script-build.exe\"`\n";
+    let parsed = cargo_critpath::parse_verbose_log(text).unwrap();
+
+    assert_eq!(parsed.invocations.len(), 2);
+    // The compilation is attributed to libc through its --out-dir, which is inside the quotes.
+    assert_eq!(parsed.invocations[0].run_package.as_deref(), Some("libc"));
+    let package = parsed.invocations[0].registry_package.as_ref().unwrap();
+    assert_eq!(package.name, "libc");
+    assert_eq!(package.version, "0.2.186");
+    // And the execution is still recognised as one, and tied to that compilation.
+    assert_eq!(parsed.invocations[1].role, Role::BuildScriptRun);
+    assert_eq!(parsed.invocations[1].run_package.as_deref(), Some("libc"));
+    assert_eq!(
+        parsed.invocations[1].run_artifact.as_deref(),
+        Some("-2222222222222222")
+    );
+}
+
+#[test]
+fn unc_and_extended_length_windows_paths_are_read() {
+    // A build on a network share gives `\\server\share\…`, and one whose paths exceed the legacy
+    // length limit gives the `\\?\C:\…` prefix. Both begin with separators that produce empty path
+    // components, which must not disturb reading the file name or the enclosing directory.
+    let text = "   Compiling demo v0.1.0\n\
+         Running `\\\\?\\C:\\tc\\bin\\rustc.exe --crate-name unicode_ident --edition=2021 \
+         \\\\server\\share\\reg\\unicode-ident-1.0.20\\src\\lib.rs --crate-type lib \
+         --emit=dep-info,metadata,link -C metadata=aaaa0000aaaa0000 \
+         -C extra-filename=-1111111111111111 --out-dir \\\\?\\C:\\ws\\target\\debug\\deps`\n\
+         Running `\\\\?\\C:\\ws\\target\\debug\\build\\libc-2222222222222222\\\
+         build-script-build.exe`\n";
+    let parsed = cargo_critpath::parse_verbose_log(text).unwrap();
+
+    assert_eq!(parsed.invocations.len(), 2);
+    assert_eq!(parsed.invocations[0].crate_name, "unicode_ident");
+    let package = parsed.invocations[0].registry_package.as_ref().unwrap();
+    assert_eq!(package.name, "unicode-ident");
+    assert_eq!(package.version, "1.0.20");
+
+    // The build-script execution is still recognised, and still attributed to its package, through
+    // an extended-length prefix.
+    assert_eq!(parsed.invocations[1].role, Role::BuildScriptRun);
+    assert_eq!(parsed.invocations[1].run_package.as_deref(), Some("libc"));
+    assert_eq!(
+        parsed.invocations[1].run_artifact.as_deref(),
+        Some("-2222222222222222")
+    );
+}
