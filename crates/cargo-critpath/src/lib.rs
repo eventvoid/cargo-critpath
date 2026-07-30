@@ -14,3 +14,11 @@
 //!
 //! Everything here takes text rather than paths, so it is testable without a filesystem.
 #![forbid(unsafe_code)]
+
+mod error;
+mod verbose;
+
+pub use error::{ParseError, UnitDescription};
+pub use verbose::{
+    parse as parse_verbose_log, ExternRef, Invocation, PackageRef, Role, VerboseLog,
+};
