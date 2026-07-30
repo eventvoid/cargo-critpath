@@ -5,7 +5,12 @@
 //! paths replaced by a placeholder root.
 
 // A test asserting a parse result is allowed to unwrap: a panic is the failure report.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic
+)]
 
 use cargo_critpath::{ParseError, Role};
 use critpath_core::{EdgeKind, UnitKind};

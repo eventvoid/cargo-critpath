@@ -45,6 +45,13 @@ impl fmt::Display for UnitDescription {
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum ParseError {
+    /// The input holds NUL characters, so it is not the UTF-8 text Cargo wrote.
+    NotUtf8 {
+        /// What was being read, for the message: `build log` or `timing report`.
+        what: &'static str,
+        /// How many NUL characters were found.
+        nuls: usize,
+    },
     /// The verbose log contained no compiler invocations at all.
     NoInvocations,
     /// A `Running` line could not be split into arguments because a quote was left open.
@@ -138,6 +145,13 @@ pub enum ParseError {
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::NotUtf8 { what, nuls } => write!(
+                f,
+                "the {what} holds {nuls} NUL characters, so it is not the UTF-8 text Cargo wrote; \
+                 a redirection under PowerShell writes UTF-16. Capture it with \
+                 `cargo build --timings -v --offline 2>&1 | Out-File -Encoding utf8 build.log`, \
+                 or from a shell that redirects as UTF-8"
+            ),
             Self::NoInvocations => write!(
                 f,
                 "the build log contains no compiler invocations; \
@@ -315,4 +329,18 @@ impl From<GraphError> for ParseError {
     fn from(inner: GraphError) -> Self {
         Self::Graph(inner)
     }
+}
+
+/// Refuses text that holds NUL characters.
+///
+/// Cargo's output is UTF-8 and never contains a NUL. UTF-16LE without a byte-order mark decodes as
+/// valid UTF-8 in which every second character is one, so this is what tells a mis-encoded capture
+/// apart from an empty one. A stray NUL is not tolerated either: there is no reading under which
+/// Cargo would have written one.
+pub(crate) fn reject_wide_text(text: &str, what: &'static str) -> Result<(), ParseError> {
+    let nuls = text.bytes().filter(|b| *b == 0).count();
+    if nuls > 0 {
+        return Err(ParseError::NotUtf8 { what, nuls });
+    }
+    Ok(())
 }

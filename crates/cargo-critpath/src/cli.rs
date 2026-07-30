@@ -6,8 +6,7 @@
 
 use core::fmt;
 use std::ffi::OsString;
-use std::fs;
-use std::io::Write;
+use std::io::{self, Write};
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 
@@ -146,6 +145,10 @@ enum UsageError {
         path: String,
         detail: String,
     },
+    /// The file was read but holds something other than the UTF-8 text Cargo writes.
+    MisEncoded {
+        detail: String,
+    },
     ExecutorCountUnknown,
 }
 
@@ -187,6 +190,9 @@ impl fmt::Display for UsageError {
                 "cannot read `{path}`: {detail}. \
                  Check the path, and that the build that was supposed to write it completed"
             ),
+            // No advice about the path or the build: the file was found and read, and neither is
+            // the problem.
+            Self::MisEncoded { detail } => write!(f, "{detail}"),
             Self::ExecutorCountUnknown => write!(
                 f,
                 "the timing report does not record what `-j` the build ran with, so there is no \
@@ -468,15 +474,30 @@ fn subcommand_of(report: &TimingReport) -> Option<&'static str> {
 }
 
 fn read(path: &Path) -> Result<String, UsageError> {
-    fs::read_to_string(path).map_err(|problem| UsageError::Unreadable {
-        path: path.display().to_string(),
-        detail: problem.to_string(),
+    crate::collect::read_text(path).map_err(|problem| {
+        if problem.kind() == io::ErrorKind::InvalidData {
+            UsageError::MisEncoded {
+                detail: problem.to_string(),
+            }
+        } else {
+            UsageError::Unreadable {
+                path: path.display().to_string(),
+                detail: problem.to_string(),
+            }
+        }
     })
 }
 
 fn usage(err: &mut dyn Write, problem: &UsageError) -> Outcome {
     let _ = writeln!(err, "error: {problem}");
-    Outcome::Usage
+    match problem {
+        // The file was found and read; what it holds is unusable. That is the same outcome as a
+        // report this tool cannot analyse, and it must not depend on whether the file happened to
+        // carry a byte-order mark: a mis-encoded log without one is caught by the parser and
+        // reported as rejected, and one with a BOM has to agree.
+        UsageError::MisEncoded { .. } => Outcome::Rejected,
+        _ => Outcome::Usage,
+    }
 }
 
 fn rejected(err: &mut dyn Write, problem: &ParseError) -> Outcome {

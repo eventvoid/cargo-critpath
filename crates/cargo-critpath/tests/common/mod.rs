@@ -88,6 +88,18 @@ pub fn assert_golden(name: &str, actual: &str, regenerate: &str) {
     );
 }
 
+/// Writes raw bytes to a uniquely named file under the temporary directory and returns its path.
+///
+/// Separate from [`scratch_file`] because an encoding that is not UTF-8 cannot be held in a `str`.
+pub fn scratch_bytes(name: &str, contents: &[u8]) -> String {
+    let directory =
+        std::env::temp_dir().join(format!("cargo-critpath-tests-{}", std::process::id()));
+    fs::create_dir_all(&directory).unwrap();
+    let path = directory.join(name);
+    fs::write(&path, contents).unwrap();
+    path.to_string_lossy().into_owned()
+}
+
 /// Writes `contents` to a uniquely named file under the temporary directory and returns its path.
 pub fn scratch_file(name: &str, contents: &str) -> String {
     let directory =

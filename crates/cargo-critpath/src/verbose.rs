@@ -110,10 +110,12 @@ pub struct VerboseLog {
 ///
 /// # Errors
 ///
-/// [`ParseError::NoInvocations`] if the log holds none, which means it was captured without `-v` or
-/// from a build that had nothing to do, and [`ParseError::UnbalancedQuoting`] if a line is cut off
-/// inside a quoted argument.
+/// [`ParseError::NotUtf8`] if the text holds NUL characters, which means it was decoded from
+/// UTF-16 rather than the UTF-8 Cargo wrote; [`ParseError::NoInvocations`] if the log holds none,
+/// which means it was captured without `-v` or from a build that had nothing to do; and
+/// [`ParseError::UnbalancedQuoting`] if a line is cut off inside a quoted argument.
 pub fn parse(text: &str) -> Result<VerboseLog, ParseError> {
+    crate::error::reject_wide_text(text, "build log")?;
     let mut invocations = Vec::new();
     let mut unrecognised = Vec::new();
 
