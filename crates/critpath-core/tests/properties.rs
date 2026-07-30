@@ -1133,38 +1133,6 @@ fn i7_with_an_executor_per_unit_the_makespan_is_the_critical_path() {
     }
 }
 
-/// I8 — Monotonicity in J. "`makespan(J+1) <= makespan(J)`. This holds for the scheduler as
-/// specified only because the priority is a fixed total order that does not depend on `J`; it is
-/// asserted as a property test precisely because it is easy to break."
-#[test]
-fn i8_another_executor_never_makes_the_build_longer() {
-    let mut strictly_improved = 0usize;
-    for (index, spec) in corpus().iter().enumerate() {
-        let graph = spec.build();
-        for policy in POLICIES {
-            let mut previous = simulate(&graph, executors(1), policy).makespan();
-            for count in 2..=12u32 {
-                let makespan = simulate(&graph, executors(count), policy).makespan();
-                assert!(
-                    makespan <= previous,
-                    "graph {index}: {count} executors gave {makespan}, worse than {previous} \
-                     at {} under {policy:?}",
-                    count - 1
-                );
-                if makespan < previous {
-                    strictly_improved += 1;
-                }
-                previous = makespan;
-            }
-        }
-    }
-    assert!(
-        strictly_improved > 100,
-        "adding an executor never once helped in the whole corpus, so monotonicity was trivial: \
-         {strictly_improved}"
-    );
-}
-
 /// I9 — Slack non-negative, zero on the critical path. "With `lft(U)` the latest finish that does
 /// not increase `CP`, `slack(U) = lft(U) - eft(U) >= 0`, and `slack(U) = 0` for every `U` on a
 /// critical path."
@@ -1184,14 +1152,16 @@ fn i9_slack_is_never_negative_and_is_zero_along_the_critical_path() {
         let sets = closures(&graph);
         let expected_starts = latest_starts(&graph, &analysis);
 
+        // Once the weights are large enough that the sums saturate, the latest-finish time is a
+        // difference of numbers that no longer stand for what they say, and it degenerates. The
+        // slack assertions below still apply there; the ones about `lft` do not. The degeneracy
+        // itself is pinned down in `saturating_weights_degrade_without_panicking`.
+        let saturated = cp == INF;
+
         for (id, unit) in graph.units() {
             let eft = analysis.earliest_finish(id).unwrap();
             let lft = analysis.latest_finish(id).unwrap();
             let slack = analysis.slack(id).unwrap();
-            assert!(
-                lft >= eft,
-                "graph {index}: unit {id} has latest finish before earliest"
-            );
             assert!(
                 lft <= cp,
                 "graph {index}: unit {id} may finish after the critical path"
@@ -1199,6 +1169,13 @@ fn i9_slack_is_never_negative_and_is_zero_along_the_critical_path() {
             if slack > Millis::ZERO {
                 positive_slack += 1;
             }
+            if saturated {
+                continue;
+            }
+            assert!(
+                lft >= eft,
+                "graph {index}: unit {id} has latest finish before earliest"
+            );
             assert_eq!(
                 slack,
                 lft.saturating_sub(eft),
@@ -2023,4 +2000,281 @@ fn a_split_adds_no_work_beyond_the_overhead_it_charges() {
         charged_splits > 200,
         "too few charged splits: {charged_splits}"
     );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Scheduling anomalies: cases where a greedy list schedule moves the wrong way
+// ---------------------------------------------------------------------------------------------
+
+/// Eleven units, five of them a chain and six of them independent filler, all joined by full
+/// edges. This shape is the counterexample behind the two anomaly tests below.
+///
+///     6 -> 7 -> 10
+///     6 -> 8 -> 9 -> 10          0 1 2 3 4 5 stand alone
+///
+/// Weights in milliseconds: 0:2800 1:3900 2:3200 3:4500 4:4100 5:3600 6:4400 7:4700 8:4600
+/// 9:300 10:4900. Nothing is pipelined and nothing requires its closure, so the only mechanism
+/// at work is the greedy list schedule of section 5.
+fn graham_shape() -> GraphSpec {
+    let totals = [
+        2800, 3900, 3200, 4500, 4100, 3600, 4400, 4700, 4600, 300, 4900,
+    ];
+    GraphSpec {
+        units: totals
+            .iter()
+            .map(|&total| UnitSpec {
+                total,
+                metadata_at: None,
+                closure: false,
+                kind: UnitKind::Lib,
+            })
+            .collect(),
+        edges: vec![
+            (6, 7, EdgeKind::Full),
+            (6, 8, EdgeKind::Full),
+            (7, 10, EdgeKind::Full),
+            (8, 9, EdgeKind::Full),
+            (9, 10, EdgeKind::Full),
+        ],
+        shape: Shape::Sparse,
+        weights: Weights::Mixed,
+    }
+}
+
+/// I8 — Monotonicity in J. "`makespan(J+1) <= makespan(J)`. This holds for the scheduler as
+/// specified only because the priority is a fixed total order that does not depend on `J`."
+///
+/// **The invariant is false as stated, and the reason given for it does not hold.** A fixed
+/// priority list is exactly the setting of Graham's 1969 anomaly: adding a processor changes which
+/// unit is running when a later one becomes ready, and a greedy scheduler cannot undo that. The
+/// graph below is an eleven-unit counterexample under `cargo-like`, with no pipelining and no
+/// closure requirement anywhere, so nothing specific to this model is involved.
+///
+/// The trace, with `cargo-like` priorities `1 + transitive reverse-dependents`, so unit 6 has
+/// priority 5, unit 8 has 3, units 7 and 9 have 2 and everything else has 1, ties by identifier:
+///
+///     J = 3: 6,0,1 start at 0. 2 at 2800, 3 at 3900, 8 at 4400, 7 at 6000, 4 at 8400,
+///            9 at 9000, 5 at 9300, 10 at 10700, ending at 15600.
+///     J = 4: 6,0,1,2 start at 0. 3 at 2800, 4 at 3200, 5 at 3900, 8 at 4400, 7 at 7300,
+///            9 at 9000, 10 at 12000, ending at 16900.
+///
+/// The fourth executor lets the filler units 2, 3, 4 and 5 start earlier, which leaves unit 7 —
+/// the one on the long path — waiting behind them until 7300 rather than starting at 6000. Both
+/// schedules are legal greedy list schedules under the same priority order.
+#[test]
+fn i8_another_executor_can_make_the_build_longer() {
+    let graph = graham_shape().build();
+    let three = simulate(&graph, executors(3), Policy::CargoLike);
+    let four = simulate(&graph, executors(4), Policy::CargoLike);
+
+    assert_eq!(three.makespan(), Millis::new(15_600));
+    assert_eq!(four.makespan(), Millis::new(16_900));
+    assert!(
+        four.makespan() > three.makespan(),
+        "the recorded executor-count anomaly no longer reproduces"
+    );
+
+    // The critical path is what a counterfactual should be anchored on: it does not move.
+    let cp = analyze(&graph).critical_path_len();
+    assert_eq!(cp, Millis::new(14_200));
+    assert!(three.makespan() >= cp && four.makespan() >= cp);
+}
+
+/// I8 again, over the corpus. Since the invariant does not hold, what can be asserted is that the
+/// anomaly is rare: an extra executor helps far more often than it hurts, and a change that made
+/// the simulator gratuitously non-monotone would show up as a jump in the count.
+///
+/// The exceptions are counted rather than skipped, and the counts are part of the assertion, so
+/// this test cannot pass by finding nothing.
+#[test]
+fn i8_another_executor_almost_always_helps() {
+    let mut violations = 0usize;
+    let mut improvements = 0usize;
+    let mut comparisons = 0usize;
+    let mut offenders: BTreeSet<usize> = BTreeSet::new();
+
+    for (index, spec) in corpus().iter().enumerate() {
+        let graph = spec.build();
+        for policy in POLICIES {
+            let mut previous = simulate(&graph, executors(1), policy).makespan();
+            for count in 2..=12u32 {
+                let makespan = simulate(&graph, executors(count), policy).makespan();
+                if makespan > previous {
+                    violations += 1;
+                    offenders.insert(index);
+                } else if makespan < previous {
+                    improvements += 1;
+                }
+                comparisons += 1;
+                previous = makespan;
+            }
+        }
+    }
+
+    assert!(comparisons > 3_000, "too few comparisons: {comparisons}");
+    assert!(
+        improvements > 1_000,
+        "an extra executor almost never helped: {improvements}"
+    );
+    assert!(
+        violations * 50 <= comparisons,
+        "the executor-count anomaly went from rare to common: {violations} of {comparisons} \
+         comparisons, in graphs {offenders:?}"
+    );
+}
+
+/// Section 7, the anomaly that is deliberately not an invariant. "Removing an edge can increase
+/// `makespan(J)`. This is a Graham scheduling anomaly and a genuine property of greedy list
+/// scheduling, not a defect. It cannot happen to `CP`, which is monotone under edge removal."
+///
+/// Five units on two executors. Unit 0 releases everything else; unit 1 needs its whole closure,
+/// so it waits for unit 0 to finish outright, while units 2 and 4 are released by unit 0's
+/// metadata at 600.
+///
+///     unit 0: 1000ms, metadata at 600      0 -> 1 metadata, and unit 1 needs its closure
+///     unit 1: 1100ms, requires closure     0 -> 2 full
+///     unit 2: 1600ms                       0 -> 3 full
+///     unit 3: 1200ms                       0 -> 4 metadata
+///     unit 4: 1400ms
+///
+/// With the edge, unit 1 cannot start before unit 0 finishes, and the schedule on two executors
+/// is 0 at 0, 4 at 600, 1 at 1000, 2 at 2000, 3 at 2100, ending at 3600. Remove the edge and unit
+/// 1 becomes a source: it starts at 0 alongside unit 0, occupying the second executor through the
+/// window unit 4 wanted, and the build ends at 3700 instead.
+#[test]
+fn removing_an_edge_can_lengthen_the_simulated_makespan() {
+    let mut spec = GraphSpec {
+        units: vec![
+            UnitSpec {
+                total: 1000,
+                metadata_at: Some(600),
+                closure: false,
+                kind: UnitKind::Lib,
+            },
+            UnitSpec {
+                total: 1100,
+                metadata_at: None,
+                closure: true,
+                kind: UnitKind::Bin,
+            },
+            UnitSpec {
+                total: 1600,
+                metadata_at: None,
+                closure: false,
+                kind: UnitKind::Lib,
+            },
+            UnitSpec {
+                total: 1200,
+                metadata_at: None,
+                closure: false,
+                kind: UnitKind::Lib,
+            },
+            UnitSpec {
+                total: 1400,
+                metadata_at: None,
+                closure: false,
+                kind: UnitKind::Lib,
+            },
+        ],
+        edges: vec![
+            (0, 1, EdgeKind::Metadata),
+            (0, 2, EdgeKind::Full),
+            (0, 3, EdgeKind::Full),
+            (0, 4, EdgeKind::Metadata),
+        ],
+        shape: Shape::Fan,
+        weights: Weights::Mixed,
+    };
+
+    let graph = spec.build();
+    let before = simulate(&graph, executors(2), Policy::CargoLike).makespan();
+    assert_eq!(before, Millis::new(3_600));
+
+    let all = ids(&graph);
+    let applied = apply(
+        &graph,
+        &Transform::RemoveEdge {
+            from: all[0],
+            to: all[1],
+        },
+    )
+    .unwrap();
+    let after = simulate(applied.graph(), executors(2), Policy::CargoLike).makespan();
+    assert_eq!(after, Millis::new(3_700));
+    assert!(
+        after > before,
+        "the recorded edge-removal anomaly no longer reproduces: {before} became {after}"
+    );
+
+    // The critical path moves the other way, which is why section 9.2 anchors the reported saving
+    // on it rather than on the simulated makespan.
+    let cp_before = analyze(&graph).critical_path_len();
+    let cp_after = analyze(applied.graph()).critical_path_len();
+    assert!(cp_after <= cp_before, "{cp_before} became {cp_after}");
+
+    // Rebuilding the same shape without the edge, rather than transforming it, gives the same
+    // answer: the anomaly is in the schedule, not in the transformation.
+    spec.edges.remove(0);
+    assert_eq!(
+        simulate(&spec.build(), executors(2), Policy::CargoLike).makespan(),
+        after
+    );
+}
+
+/// Weights near the representable maximum, where `Millis` saturates.
+///
+/// What survives saturation: nothing panics, `CP` and the makespan stay above the bounds of
+/// section 6, and the reported slack stays non-negative as I9 requires. What does not survive is
+/// the latest-finish time. Once `CP` saturates, the backward pass subtracts from a total that is
+/// no longer the sum it stands for, and a unit can be told it must finish before the earliest it
+/// can finish. The two-unit graph below is the smallest case: each unit takes half the
+/// representable range plus a little, so the chain is one millisecond too long to represent.
+#[test]
+fn saturating_weights_degrade_without_panicking() {
+    let half = 1u64 << 63;
+    let spec = GraphSpec {
+        units: vec![
+            UnitSpec {
+                total: half,
+                metadata_at: None,
+                closure: false,
+                kind: UnitKind::Lib,
+            },
+            UnitSpec {
+                total: half,
+                metadata_at: None,
+                closure: false,
+                kind: UnitKind::Lib,
+            },
+        ],
+        edges: vec![(0, 1, EdgeKind::Full)],
+        shape: Shape::Chain,
+        weights: Weights::Extreme,
+    };
+    let graph = spec.build();
+    let analysis = analyze(&graph);
+    let all = ids(&graph);
+
+    // The chain is 2^64 milliseconds long, which does not fit, so it is reported as the largest
+    // duration there is.
+    assert_eq!(analysis.critical_path_len(), Millis::new(u64::MAX));
+    assert_eq!(analysis.earliest_finish(all[0]), Some(Millis::new(half)));
+
+    // I9 holds in the only sense that survives: the reported slack is not negative.
+    for &id in &all {
+        assert!(analysis.slack(id).unwrap() >= Millis::ZERO);
+    }
+    // But the first unit is told to finish before it can, which is what saturation costs.
+    assert!(
+        analysis.latest_finish(all[0]).unwrap() < analysis.earliest_finish(all[0]).unwrap(),
+        "the latest-finish time no longer degenerates under saturation; if that is now handled, \
+         the corpus check in i9 can drop its exclusion of saturating graphs"
+    );
+
+    // The bounds of sections 5 and 6 still hold, and nothing panics.
+    for count in [1u32, 2, 5] {
+        let makespan = simulate(&graph, executors(count), Policy::CargoLike).makespan();
+        assert!(makespan >= analysis.critical_path_len());
+        assert!(makespan >= area_bound(&graph, executors(count)));
+    }
 }
