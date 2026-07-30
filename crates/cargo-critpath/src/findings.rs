@@ -380,7 +380,9 @@ pub(crate) fn assemble(
 
     let mut diagnostics = build.diagnostics.clone();
     diagnostics.extend(noise_diagnostics(&noise, &scenarios, samples.len()));
-    // `Severity` orders errors before warnings, which is the order the contract asks for.
+    // Most serious first, then by code. `Severity` has one variant today, so this reduces to
+    // ordering by code. A more serious severity added later must be declared *before* `Warning`,
+    // because the derived ordering follows declaration order and this sort depends on it.
     diagnostics.sort_by(|a, b| {
         a.severity
             .cmp(&b.severity)
