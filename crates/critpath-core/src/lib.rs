@@ -16,8 +16,10 @@ mod analysis;
 mod error;
 mod graph;
 mod millis;
+mod schedule;
 
 pub use analysis::{analyze, Analysis};
 pub use error::GraphError;
 pub use graph::{BuildGraph, Dep, EdgeKind, GraphBuilder, Unit, UnitId, UnitKind, MAX_UNITS};
 pub use millis::Millis;
+pub use schedule::{area_bound, lower_bound, simulate, Policy, Schedule};
