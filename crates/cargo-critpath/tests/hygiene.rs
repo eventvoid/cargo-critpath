@@ -9,6 +9,9 @@ use std::fs;
 use std::path::Path;
 
 /// Fragments that would mean a real machine's filesystem leaked into a committed file.
+///
+/// These are search patterns, not paths. This file is the one place in the repository where they
+/// are allowed to appear, and removing them would remove the check rather than satisfy it.
 const FORBIDDEN: [&str; 4] = ["/Users/", "/home/", "C:\\Users\\", "/root/"];
 
 fn check(directory: &Path, findings: &mut Vec<String>) {

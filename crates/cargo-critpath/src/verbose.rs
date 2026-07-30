@@ -460,14 +460,15 @@ fn directory_package(source: &str) -> Option<String> {
 
 /// A path's components, whichever separator it uses. Cargo writes native separators, and a log
 /// captured on Windows is analysed on Windows, but a fixture is read on every platform.
-// Splitting on a character array does not yield a double-ended iterator on the minimum supported
-// compiler, so the components are collected rather than walked backwards.
-fn components(path: &str) -> impl Iterator<Item = &str> {
-    path.split(['/', '\\']).filter(|s| !s.is_empty())
+fn components(path: &str) -> impl DoubleEndedIterator<Item = &str> {
+    // A slice rather than an array: only the slice form searches backwards on the pinned minimum
+    // supported Rust version.
+    const SEPARATORS: &[char] = &['/', '\\'];
+    path.split(SEPARATORS).filter(|s| !s.is_empty())
 }
 
 fn file_name(path: &str) -> &str {
-    components(path).last().unwrap_or("")
+    components(path).next_back().unwrap_or("")
 }
 
 fn file_stem(path: &str) -> &str {

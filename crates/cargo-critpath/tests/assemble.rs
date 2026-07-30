@@ -6,7 +6,12 @@
 //! number below was read off those two files by hand.
 
 // A test asserting a parse result is allowed to unwrap: a panic is the failure report.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic
+)]
 
 use cargo_critpath::{BuildInput, ParseError};
 use critpath_core::{EdgeKind, Millis, UnitId, UnitKind};
@@ -144,7 +149,11 @@ fn the_build_script_triple_is_wired_compile_then_run_then_the_package() {
         let lib = unit_of(&input, package, "lib");
         // Neither of these edges is named by any `--extern`; they are Cargo's three-unit pattern,
         // reconstructed from the `build/<package>-<hash>` directory the run executes from.
-        assert_eq!(edge(&input, compile, run), Some(EdgeKind::Full), "{package}");
+        assert_eq!(
+            edge(&input, compile, run),
+            Some(EdgeKind::Full),
+            "{package}"
+        );
         assert_eq!(edge(&input, run, lib), Some(EdgeKind::Full), "{package}");
         // And not the other way round.
         assert_eq!(edge(&input, run, compile), None, "{package}");
@@ -238,13 +247,7 @@ fn a_missing_invocation_is_a_refusal_rather_than_a_smaller_graph() {
 fn an_incremental_build_is_refused_before_any_graph_is_built() {
     let err = cargo_critpath::parse(INCREMENTAL_VERBOSE, INCREMENTAL_TIMING).unwrap_err();
     // Touching one file left seven of nine units cached.
-    assert_eq!(
-        err,
-        ParseError::FreshUnits {
-            fresh: 7,
-            total: 9
-        }
-    );
+    assert_eq!(err, ParseError::FreshUnits { fresh: 7, total: 9 });
 }
 
 #[test]
