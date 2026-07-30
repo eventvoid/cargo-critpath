@@ -21,6 +21,19 @@ closure, and Cargo's three-unit build-script pattern — in a graph small enough
 - `cargo-timing.html` — `target/cargo-timings/cargo-timing.html`, complete.
 - `cargo-metadata.json` — `cargo metadata --format-version 1 --offline --no-deps`.
 
+### `workspace/cargo-timing-slower.html` is derived, not captured
+
+This one file is **not** the output of a second build. It is `workspace/cargo-timing.html` with
+every `start`, every `duration`, every section boundary and the `Total time` row multiplied by 1.10
+and rounded to the two decimal places Cargo writes. Everything else, including the unit set, the
+feature sets and the `unblocked_*` fields, is unchanged.
+
+It exists because the run-to-run spread of the critical path needs at least two reports of the same
+build to be measurable at all, and only one build of this workspace was captured. A uniform 10%
+stretch is a plausible repeat — the measured spread on real projects runs from 2.3% to 11.8% — but
+it is a stretch of one measurement rather than a second measurement, and no figure derived from it
+should be quoted as evidence about real builds. It is test input for the code path, nothing more.
+
 ## `incremental/`
 
 The same workspace rebuilt after touching one file, so seven of the nine units were reused. Its
