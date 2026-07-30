@@ -1,0 +1,341 @@
+
+<html>
+<head>
+  <title>Cargo Build Timings — app 0.1.0, hello-macros 0.1.0, leaf 0.1.0, mid 0.1.0</title>
+  <meta charset="utf-8">
+<style type="text/css">
+:root {
+  --error-text: #e80000;
+  --text: #000;
+  --background: #fff;
+  --h1-border-bottom: #c0c0c0;
+  --table-box-shadow: rgba(0, 0, 0, 0.1);
+  --table-th: #d5dde5;
+  --table-th-background: #1b1e24;
+  --table-th-border-bottom: #9ea7af;
+  --table-th-border-right: #343a45;
+  --table-tr-border-top: #c1c3d1;
+  --table-tr-border-bottom: #c1c3d1;
+  --table-tr-odd-background: #ebebeb;
+  --table-td-background: #ffffff;
+  --table-td-border-right: #C1C3D1;
+  --canvas-background: #f7f7f7;
+  --canvas-axes: #303030;
+  --canvas-grid: #e6e6e6;
+  --canvas-codegen: #aa95e8;
+  --canvas-link: #95e8aa;
+  --canvas-other: #e895aa;
+  --canvas-custom-build: #f0b165;
+  --canvas-not-custom-build: #95cce8;
+  --canvas-dep-line: #ddd;
+  --canvas-dep-line-highlighted: #000;
+  --canvas-cpu: rgba(250, 119, 0, 0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --error-text: #e80000;
+    --text: #fff;
+    --background: #121212;
+    --h1-border-bottom: #444;
+    --table-box-shadow: rgba(255, 255, 255, 0.1);
+    --table-th: #a0a0a0;
+    --table-th-background: #2c2c2c;
+    --table-th-border-bottom: #555;
+    --table-th-border-right: #444;
+    --table-tr-border-top: #333;
+    --table-tr-border-bottom: #333;
+    --table-tr-odd-background: #1e1e1e;
+    --table-td-background: #262626;
+    --table-td-border-right: #333;
+    --canvas-background: #1a1a1a;
+    --canvas-axes: #b0b0b0;
+    --canvas-grid: #333;
+    --canvas-block: #aa95e8;
+    --canvas-custom-build: #f0b165;
+    --canvas-not-custom-build: #95cce8;
+    --canvas-dep-line: #444;
+    --canvas-dep-line-highlighted: #fff;
+    --canvas-cpu: rgba(250, 119, 0, 0.2);
+  }
+}
+
+html {
+  font-family: sans-serif;
+  color: var(--text);
+  background: var(--background);
+}
+
+.canvas-container {
+  position: relative;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+
+.canvas-container.hidden {
+  display: none;
+}
+
+h1 {
+  border-bottom: 1px solid var(--h1-border-bottom);
+}
+
+.graph {
+  display: block;
+}
+
+.my-table {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  border-collapse: collapse;
+  box-shadow: 0 5px 10px var(--table-box-shadow);
+}
+
+.my-table th {
+  color: var(--table-th);
+  background: var(--table-th-background);
+  border-bottom: 4px solid var(--table-th-border-bottom);
+  border-right: 1px solid var(--table-th-border-right);
+  font-size: 18px;
+  font-weight: 100;
+  padding: 12px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.my-table th:first-child {
+  border-top-left-radius: 3px;
+}
+
+.my-table th:last-child {
+  border-top-right-radius: 3px;
+  border-right:none;
+}
+
+.my-table tr {
+  border-top: 1px solid var(--table-tr-border-top);
+  border-bottom: 1px solid var(--table-tr-border-bottom);
+  font-size: 16px;
+  font-weight: normal;
+}
+
+.my-table tr:first-child {
+  border-top:none;
+}
+
+.my-table tr:last-child {
+  border-bottom:none;
+}
+
+.my-table tr:nth-child(odd) td {
+  background: var(--table-tr-odd-background);
+}
+
+.my-table tr:last-child td:first-child {
+  border-bottom-left-radius:3px;
+}
+
+.my-table tr:last-child td:last-child {
+  border-bottom-right-radius:3px;
+}
+
+.my-table td {
+  background: var(--table-td-background);
+  padding: 10px;
+  text-align: left;
+  vertical-align: middle;
+  font-weight: 300;
+  font-size: 14px;
+  border-right: 1px solid var(--table-td-border-right);
+}
+
+.my-table td:last-child {
+  border-right: 0px;
+}
+
+.summary-table td:first-child {
+  vertical-align: top;
+  text-align: right;
+}
+
+.input-table td {
+  text-align: center;
+}
+
+.error-text {
+  color: var(--error-text);
+}
+
+</style>
+</head>
+<body>
+
+<h1>Cargo Build Timings</h1>
+See <a href="https://doc.rust-lang.org/nightly/cargo/reference/timings.html">Documentation</a>
+
+<table class="my-table summary-table">
+<tr>
+<td>Targets:</td><td>app 0.1.0 ( demo "bin")<br>hello-macros 0.1.0 (lib)<br>leaf 0.1.0 (lib)<br>mid 0.1.0 (lib)</td>
+</tr>
+<tr>
+<td>Profile:</td><td>dev</td>
+</tr>
+<tr>
+<td>Fresh units:</td><td>0</td>
+</tr>
+<tr>
+<td>Dirty units:</td><td>9</td>
+</tr>
+<tr>
+<td>Total units:</td><td>9</td>
+</tr>
+<tr>
+<td>Max concurrency:</td><td>3 (jobs=4 ncpu=10)</td>
+</tr>
+<tr>
+<td>Build start:</td><td>2026-07-30T07:06:05.429413Z</td>
+</tr>
+<tr>
+<td>Total time:</td><td>1.4s</td>
+</tr>
+<tr>
+<td>rustc:</td><td>rustc 1.95.0 (59807616e 2026-04-14)<br>Host: aarch64-apple-darwin<br>Target: aarch64-apple-darwin</td>
+</tr>
+
+</table>
+
+<table class="input-table">
+  <tr>
+    <td><label for="min-unit-time">Min unit time:</label></td>
+    <td title="Scale corresponds to a number of pixels per second. It is automatically initialized based on your viewport width.">
+      <label for="scale">Scale:</label>
+    </td>
+  </tr>
+  <tr>
+    <td><input type="range" min="0" max="30" step="0.1" value="0" id="min-unit-time"></td>
+    <!--
+        The scale corresponds to some number of "pixels per second".
+        Its min, max, and initial values are automatically set by JavaScript on page load,
+        based on the client viewport.
+    -->
+    <td><input type="range" min="1" max="100" value="50" id="scale"></td>
+  </tr>
+  <tr>
+    <td><output for="min-unit-time" id="min-unit-time-output"></output></td>
+    <td><output for="scale" id="scale-output"></output></td>
+    <td></td>
+  </tr>
+</table>
+
+<div id="pipeline-container" class="canvas-container"></div>
+<div id="timing-container" class="canvas-container"></div>
+
+<table class="my-table">
+<thead>
+<tr>
+  <th></th>
+  <th>Unit</th>
+  <th>Total</th>
+  <th>Frontend</th>
+<th>Codegen</th>
+  <th>Features</th>
+</tr>
+</thead>
+<tbody>
+
+<tr>
+<td>1.</td>
+<td>libc v0.2.189 build-script (run)</td>
+<td>0.7s</td>
+<td></td>
+<td></td>
+<td>default, std</td>
+</tr>
+
+<tr>
+<td>2.</td>
+<td>mid v0.1.0</td>
+<td>0.5s</td>
+<td>0.5s (98%)</td>
+<td>0.0s (2%)</td>
+<td></td>
+</tr>
+
+<tr>
+<td>3.</td>
+<td>leaf v0.1.0 build-script (run)</td>
+<td>0.4s</td>
+<td></td>
+<td></td>
+<td>default, greeting</td>
+</tr>
+
+<tr>
+<td>4.</td>
+<td>libc v0.2.189</td>
+<td>0.3s</td>
+<td>0.3s (93%)</td>
+<td>0.0s (7%)</td>
+<td>default, std</td>
+</tr>
+
+<tr>
+<td>5.</td>
+<td>libc v0.2.189 build-script</td>
+<td>0.1s</td>
+<td></td>
+<td></td>
+<td>default, std</td>
+</tr>
+
+<tr>
+<td>6.</td>
+<td>hello-macros v0.1.0</td>
+<td>0.1s</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+
+<tr>
+<td>7.</td>
+<td>app v0.1.0 demo "bin"</td>
+<td>0.1s</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+
+<tr>
+<td>8.</td>
+<td>leaf v0.1.0 build-script</td>
+<td>0.1s</td>
+<td></td>
+<td></td>
+<td>default, greeting</td>
+</tr>
+
+<tr>
+<td>9.</td>
+<td>leaf v0.1.0</td>
+<td>0.0s</td>
+<td>0.0s (75%)</td>
+<td>0.0s (25%)</td>
+<td>default, greeting</td>
+</tr>
+</tbody>
+</table>
+<script>
+DURATION = 2;
+const UNIT_DATA = [
+  {
+    "i": 3,
+    "name": "leaf",
+    "version": "0.1.0",
+    "mode": "todo",
+    "target": " build-script",
+    "features": [
+      "default",
+      "greeting"
+    ],
+    
