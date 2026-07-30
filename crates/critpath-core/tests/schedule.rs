@@ -380,8 +380,11 @@ fn i3_never_more_units_running_than_executors() {
 
 #[test]
 fn i8_more_executors_never_lengthen_these_schedules() {
-    // Monotonicity is a property of the fixed priority order, which does not consult the executor
-    // count. It is checked on every shape and both policies rather than assumed.
+    // I8 states that makespan(J + 1) <= makespan(J) always. It does not: see
+    // `more_executors_can_lengthen_a_schedule` below for a graph where it fails, and the reason it
+    // fails. What is checked here is the weaker true statement, that these shapes are monotone,
+    // which is worth pinning down because the anomaly is rare enough that a regression making it
+    // common would otherwise pass unnoticed.
     for (name, specs, edges) in shapes() {
         let (graph, _) = build(&specs, &edges);
         for policy in POLICIES {
@@ -399,6 +402,71 @@ fn i8_more_executors_never_lengthen_these_schedules() {
             }
         }
     }
+}
+
+#[test]
+fn more_executors_can_lengthen_a_schedule() {
+    // Seven units. u3 (3 ms, metadata at 2) releases u4 (3 ms), which releases u6 (2 ms); the
+    // other four are independent filler of 1, 1, 2 and 2 ms. Cargo-like priorities are structural,
+    // so u3 is 3, u4 is 2 and everything else is 1.
+    //
+    // On two executors:
+    //   0  u3 0..3 and u0 0..1     1  u1 1..2
+    //   2  u3 emits its metadata and u4, at priority 2, takes the executor u1 just freed: 2..5
+    //   3  u2 3..5                 5  u5 5..7 and u6 5..7          makespan 7
+    //
+    // On three executors:
+    //   0  u3 0..3, u0 0..1, u1 0..1
+    //   1  two executors free, and u4 is not released until 2, so the filler takes them both:
+    //      u2 1..3 and u5 1..3
+    //   2  u4 is released, and all three executors are busy until 3
+    //   3  u4 3..6                 6  u6 6..8                      makespan 8
+    //
+    // The extra executor let the filler start sooner, and the filler was still holding the machines
+    // at the instant the unit on the critical path became runnable. This is a Graham anomaly: a
+    // greedy list scheduler is not monotone in the number of machines. It is rare rather than
+    // pathological -- a search over 200 000 random graphs of three to eight units found it in 8 of
+    // them -- and it is not caused by the metadata semantics, since the same search restricted to
+    // full edges and no metadata found 8 in 1 000 000 graphs.
+    //
+    // The critical path is 7, which is what makes the three-executor answer visibly wrong: it is
+    // above the bound its own graph guarantees on two.
+    let (graph, ids) = build(
+        &[
+            (1, None, false),
+            (1, None, false),
+            (2, None, false),
+            (3, Some(2), false),
+            (3, None, false),
+            (2, None, false),
+            (2, None, false),
+        ],
+        &[(3, 4, EdgeKind::Metadata), (4, 6, EdgeKind::Full)],
+    );
+
+    let two = simulate(&graph, j(2), Policy::CargoLike);
+    let three = simulate(&graph, j(3), Policy::CargoLike);
+
+    assert_eq!(two.makespan(), Millis::new(7));
+    assert_eq!(three.makespan(), Millis::new(8));
+    assert!(three.makespan() > two.makespan());
+
+    assert_eq!(two.start(ids[4]), Some(Millis::new(2)));
+    assert_eq!(three.start(ids[4]), Some(Millis::new(3)));
+    assert_eq!(three.start(ids[2]), Some(Millis::new(1)));
+    assert_eq!(three.start(ids[5]), Some(Millis::new(1)));
+
+    // Nothing else gives way: the critical path is 7 on both, and both schedules still meet it.
+    let analysis = analyze(&graph);
+    assert_eq!(analysis.critical_path_len(), Millis::new(7));
+    assert!(two.makespan() >= analysis.critical_path_len());
+    assert!(three.makespan() >= analysis.critical_path_len());
+
+    // Beyond the anomaly the curve recovers, so the extra executors are not simply wasted.
+    assert_eq!(
+        simulate(&graph, j(4), Policy::CargoLike).makespan(),
+        Millis::new(7)
+    );
 }
 
 #[test]

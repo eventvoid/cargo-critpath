@@ -293,6 +293,10 @@ fn backward_pass(graph: &BuildGraph, count: usize, critical_path_len: Millis) ->
             let consumer_latest_start = consumer_latest_finish.saturating_sub(consumer.total);
 
             if consumer.requires_full_closure {
+                // This unit is in the consumer's closure, so it has to be finished before the
+                // consumer starts. Anything requiring the consumer's closure requires this unit's
+                // too, but its deadline is never the tighter one -- the consumer has to fit in
+                // between -- so it does not have to be carried across separately.
                 take_earlier(&mut cap, consumer_latest_start);
             } else {
                 // A closure requirement further downstream reaches through this consumer.
@@ -306,11 +310,6 @@ fn backward_pass(graph: &BuildGraph, count: usize, critical_path_len: Millis) ->
                 let slack_past_release = unit.total.saturating_sub(offset);
                 bound = bound.min(consumer_latest_start.saturating_add(slack_past_release));
             }
-        }
-        // A consumer that requires its closure subsumes its own direct edge, so the edge case above
-        // deliberately does not run for it.
-        if let Some(inherited) = closure_cap.get(id.index()).copied().flatten() {
-            take_earlier(&mut cap, inherited);
         }
         if let Some(cap) = cap {
             bound = bound.min(cap);

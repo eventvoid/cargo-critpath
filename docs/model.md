@@ -43,7 +43,9 @@ Cargo the rule is derived from the compiler invocations themselves; see
 
 ## 3. Release time
 
-For an edge `e = (D -> U)`, the moment it stops blocking `U`:
+For an edge `e = (D -> U)`, the moment it stops blocking `U`. Note that both forms are offsets from
+the producer's **start**, not from its finish: a metadata edge is released partway through the
+producer's own run.
 
     release(e) = start(D) + metadata_at(D)    if kind(e) = Metadata
     release(e) = start(D) + total(D)          if kind(e) = Full
@@ -225,13 +227,15 @@ dependence on hash iteration order.
 **I7 — Unlimited executors reach the critical path.** For `J >= unit count`,
 `makespan(J) == CP` exactly.
 
-**I8 — Monotonicity in J.** `makespan(J+1) <= makespan(J)`. This holds for the scheduler as
-specified only because the priority is a fixed total order that does not depend on `J`; it is
-asserted as a property test precisely because it is easy to break.
+**I8 — Monotonicity in J does NOT hold.** See the anomalies section below. The number is kept so
+that the other invariants need not be renumbered, and so that the retraction is visible rather than
+silently absent.
 
 **I9 — Slack non-negative, zero on the critical path.** With `lft(U)` the latest finish that
 does not increase `CP`, `slack(U) = lft(U) - eft(U) >= 0`, and `slack(U) = 0` for every `U` on a
-critical path.
+critical path. Slack is room in a unit's *finish time*, not a licence to lengthen the unit by that
+much: growing a unit by its slack can move `CP`, because a consumer joined by a metadata edge is
+released from the producer's start rather than its finish and so does not absorb the extra time.
 
 **I10 — `CP` is independent of `J`.** Computing `CP` never consults `J`.
 
@@ -260,11 +264,30 @@ recurrence of section 3.1 equals `max over D in transitiveDeps(U) of eft(D)`, co
 explicit enumeration. This is a differential test against a deliberately naive implementation,
 because the recurrence is the part of the model most likely to be subtly wrong.
 
-### An anomaly that is deliberately not an invariant
+### Anomalies that are deliberately not invariants
 
-**Removing an edge can increase `makespan(J)`.** This is a Graham scheduling anomaly and a
-genuine property of greedy list scheduling, not a defect. It cannot happen to `CP`, which is
-monotone under edge removal; only the bounded-executor simulation is affected.
+Both of these are Graham scheduling anomalies: genuine properties of greedy list scheduling, not
+defects. Neither can happen to `CP`, which is monotone under both changes; only the
+bounded-executor simulation is affected.
+
+**Removing an edge can increase `makespan(J)`.**
+
+**Adding an executor can increase `makespan(J)`.** An earlier version of this document asserted the
+opposite as invariant I8, reasoning that it held because the priority is a fixed total order that
+does not depend on `J`. That reasoning is wrong. A counterexample is in the test suite as
+`more_executors_can_lengthen_a_schedule`: seven units that finish in 7 ms on two executors and 8 ms
+on three. The extra executor lets low-priority work start earlier, and it is still occupying a
+machine at the instant the critical unit becomes ready.
+
+It is rare but not vanishing: 8 occurrences in 200 000 random 3-to-8-unit graphs under both
+policies. Restricting the search to full edges with no metadata still found 8 in 1 000 000, so
+pipelining makes it about five times likelier without being the cause.
+
+The consequence for the tool is that the executor scan must not present `makespan(J)` as a monotone
+curve. The knee that section 9.4 reports is decided by `CP` and by total work, neither of which is
+affected, so the recommendation is safe; only the absolute makespans printed beside it can move the
+wrong way, and a scan that reported them as a smooth improvement would be claiming something the
+scheduler does not guarantee.
 
 So a counterfactual never reports a negative saving as though it were a modelling error, and
 never silently clamps one to zero. Where the simulated makespan moves the wrong way, the
@@ -387,4 +410,10 @@ error given.
   hand it a graph. Supporting another build system means writing another adapter, not touching
   the core.
 - No `unwrap`, `expect`, `panic!` or unchecked indexing. Errors are typed.
-- Critical path, slack and one simulation are each `O(V + E)`.
+- Critical path and slack are `O(V + E)`.
+- A simulation is not. A list scheduler needs a priority queue, and the `cargo-like` priority is a
+  count of transitive reverse-dependents — reachability counting, for which no linear-time algorithm
+  on a general DAG is known. The implementation propagates a 64-unit membership mask backwards,
+  giving `O((V/64)(V + E))` time in `O(V)` memory. An earlier version of this document claimed
+  `O(V + E)` for a simulation; that was not achievable and the claim was wrong rather than merely
+  unmet.
