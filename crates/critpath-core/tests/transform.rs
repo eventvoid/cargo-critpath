@@ -273,7 +273,10 @@ fn optimistic_split_gives_each_dependent_exactly_one_part() {
     // Four dependents, one incoming edge each, and no incoming edges anywhere else.
     assert_eq!(split.edge_count(), 4);
     for dependent in [d0, d1, d2, d3] {
-        assert_eq!(split.dependencies(kept(&applied, dependent)).unwrap().len(), 1);
+        assert_eq!(
+            split.dependencies(kept(&applied, dependent)).unwrap().len(),
+            1
+        );
     }
 
     // 800 * 1/2 = 400, remainder 800 - 400 = 400, no overhead.
@@ -569,10 +572,7 @@ fn removing_an_edge_deletes_that_edge_and_nothing_else() {
     );
     assert!(cut.dependencies(kept(&applied, mid)).unwrap().is_empty());
     // `a` now feeds nothing, so it becomes a root: removing an edge does not prune units.
-    assert_eq!(
-        roots(cut),
-        vec![kept(&applied, a), kept(&applied, end)]
-    );
+    assert_eq!(roots(cut), vec![kept(&applied, a), kept(&applied, end)]);
 }
 
 #[test]
@@ -749,6 +749,92 @@ fn removing_a_unit_from_another_graph_is_an_error() {
         }
     );
     assert!(error.to_string().contains("not part of this graph"));
+}
+
+#[test]
+fn an_optimistic_split_leaves_the_edges_it_does_not_touch_alone() {
+    let (graph, [deep, mid, heavy, shared, app]) = dragged_in_graph();
+
+    let applied = apply(
+        &graph,
+        &Transform::SplitUnit {
+            unit: heavy,
+            numerator: 1,
+            denominator: nz(4),
+            dependents: SplitDependents::Optimistic,
+            overhead: Millis::new(20),
+        },
+    )
+    .unwrap();
+    let split = applied.graph();
+    let (first, second) = split_halves(&applied, heavy);
+
+    // Work: 900 * 1/4 = 225 exactly, remainder 900 - 225 = 675, plus 20ms overhead each.
+    assert_eq!(split.unit(first).unwrap().total, Millis::new(245));
+    assert_eq!(split.unit(second).unwrap().total, Millis::new(695));
+    // Metadata: 400 * 1/4 = 100 and 400 * 3/4 = 300, neither near its part's total.
+    assert_eq!(
+        split.unit(first).unwrap().metadata_at,
+        Some(Millis::new(100))
+    );
+    assert_eq!(
+        split.unit(second).unwrap().metadata_at,
+        Some(Millis::new(300))
+    );
+    // 700 + 500 + 900 + 150 + 250 = 2500 before, and only the two overheads are added.
+    assert_eq!(graph.total_work(), Millis::new(2500));
+    assert_eq!(split.total_work(), Millis::new(2540));
+
+    // `heavy` had two producers, and both parts inherit both of them: deep -> mid stays as it was,
+    // mid and shared each feed both parts, `app` takes one part because it is the only dependent
+    // and so ranks first, and shared -> app is untouched. 1 + 2 + 2 + 1 + 1 = 7 edges.
+    assert_eq!(split.edge_count(), 7);
+    let new_mid = kept(&applied, mid);
+    let new_shared = kept(&applied, shared);
+    assert_eq!(producers(split, new_mid), vec![kept(&applied, deep)]);
+    assert_eq!(producers(split, first), vec![new_mid, new_shared]);
+    assert_eq!(producers(split, second), vec![new_mid, new_shared]);
+    assert_eq!(
+        producers(split, kept(&applied, app)),
+        vec![first, new_shared]
+    );
+}
+
+#[test]
+fn the_mapping_can_be_read_without_matching_on_it() {
+    let (graph, [deep, _, heavy, shared, _]) = dragged_in_graph();
+
+    let split = apply(
+        &graph,
+        &Transform::SplitUnit {
+            unit: heavy,
+            numerator: 1,
+            denominator: nz(2),
+            dependents: SplitDependents::Pessimistic,
+            overhead: Millis::ZERO,
+        },
+    )
+    .unwrap();
+    let (first, second) = split_halves(&split, heavy);
+    // The first part stands for the original unit, and the second is reachable beside it.
+    assert_eq!(split.mapped(heavy).unwrap().primary(), Some(first));
+    assert_eq!(split.mapped(heavy).unwrap().secondary(), Some(second));
+    assert!(!split.mapped(heavy).unwrap().is_removed());
+
+    let pruned = apply(&graph, &Transform::RemoveUnits { units: vec![heavy] }).unwrap();
+    // A unit that survived has one identifier and no second one.
+    assert_eq!(
+        pruned.mapped(shared).unwrap().primary(),
+        Some(kept(&pruned, shared))
+    );
+    assert_eq!(pruned.mapped(shared).unwrap().secondary(), None);
+    // A unit that was pruned has none.
+    assert!(pruned.mapped(deep).unwrap().is_removed());
+    assert_eq!(pruned.mapped(deep).unwrap().primary(), None);
+
+    // The graph can be taken by value once the mapping has been read.
+    assert_eq!(pruned.graph().len(), 2);
+    assert_eq!(pruned.into_graph().len(), 2);
 }
 
 #[test]
