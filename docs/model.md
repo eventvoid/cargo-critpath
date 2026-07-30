@@ -260,10 +260,14 @@ surprised by them.
    with load. Predictions for `J` far from the measured value therefore drift, and in a known
    direction: they are optimistic for large `J`.
 
-2. **One unit occupies one executor.** Cargo hands `rustc` jobserver tokens and a single `rustc`
-   can hold more than one for parallel codegen, so "J executors" is an abstraction over a token
-   pool. The measured durations already contain whatever internal parallelism the observed build
-   received, which makes the baseline self-consistent and the extrapolation approximate.
+2. **One unit occupies one executor.** Cargo hands `rustc` jobserver tokens, and a `rustc` process
+   holds one implicit token for its lifetime while acquiring more for parallel codegen. So `J` is a
+   bound on a token pool, not a count of concurrent compilations. The direction of the error is
+   known: because real compilations can consume more than one token each, fewer units run
+   concurrently than the model assumes, so **the simulated makespan under-predicts wall time**, and
+   it does so more as `codegen-units` rises. The measured durations already contain whatever
+   internal parallelism the observed build received, which makes the baseline self-consistent and
+   the extrapolation approximate.
 
 3. **Non-compilation time is excluded.** Registry index updates, crate downloads and time spent
    in an external linker are outside the unit model. Predictions are compared against the
