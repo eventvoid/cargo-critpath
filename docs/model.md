@@ -105,6 +105,13 @@ The rule is kept because it is what Cargo does, it was observed directly, and it
 counterfactual transformation or on a `cargo test` graph where every test unit is a synchronisation
 point. But it is not what makes the model accurate, and it should not be read as though it were.
 
+It also shows up from Cargo's side, independently of the timing measurements above. For a unit that
+requires upstream objects, Cargo *materialises* dependency edges to that unit's entire transitive
+closure. The evidence is in the timing report's own unblock records: `syn` is recorded as unblocking
+`bevy_encase_derive`, whose `rustc` invocation carries no `--extern syn` at all. Checking those
+records against a graph built only from direct edges leaves such pairs unexplained; making the check
+closure-aware accounts for all of them, on all four measured projects.
+
 By contrast, the refinement that does carry its weight is pipelining. Reclassifying every metadata
 edge as a full edge lengthens the critical path by 28.3% on ripgrep, 2.0% on async-graphql, 31.6%
 on rust-analyzer and 23.6% on bevy. Ignoring pipelining is the error that would matter.
