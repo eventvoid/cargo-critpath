@@ -91,10 +91,10 @@ So `requires_full_closure` is a property of the consumer, and it reaches past it
 path with the closure requirement cleared on every unit changed it by exactly 0 ms on all four
 validation projects:
 
-    ripgrep         5800 ms -> 5800 ms
-    async-graphql  18160 ms -> 18160 ms
-    rust-analyzer  58580 ms -> 58580 ms
-    bevy          164540 ms -> 164540 ms
+    ripgrep         5800 ms ->   5800 ms
+    async-graphql  18030 ms ->  18030 ms
+    rust-analyzer  59270 ms ->  59270 ms
+    bevy          151510 ms -> 151510 ms
 
 The 30% figure above comes from a four-crate fixture built specifically to exhibit the effect. On
 real graphs a linking unit's direct dependencies are already `Full` edges, and the heavy units sit
@@ -113,7 +113,7 @@ records against a graph built only from direct edges leaves such pairs unexplain
 closure-aware accounts for all of them, on all four measured projects.
 
 By contrast, the refinement that does carry its weight is pipelining. Reclassifying every metadata
-edge as a full edge lengthens the critical path by 28.3% on ripgrep, 2.0% on async-graphql, 31.6%
+edge as a full edge lengthens the critical path by 27.8% on ripgrep, 3.0% on async-graphql, 32.8%
 on rust-analyzer and 23.6% on bevy. Ignoring pipelining is the error that would matter.
 
 **It does not need a transitive closure to be materialised.** Define, over units in topological
