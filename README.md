@@ -176,8 +176,21 @@ The model is in [docs/model.md](docs/model.md). What matters before reading an e
 **Pipelining is accounted for.** A dependent starts when its dependency emits metadata, not after full
 codegen. Ignoring it overstates the critical path by 3% to 33% on the measured projects.
 
-**Accuracy, measured.** Given a build's own weights, the simulated makespan landed within **2.1% of
-the real compilation span on all 24 captured builds**, and within 1% on 18 of them.
+**Accuracy, measured — of the simulator, not of the advice.** Given a build's own weights, the
+simulated makespan landed within **2.1% of the real compilation span on all 24 captured builds**, and
+within 1% on 18 of them.
+
+Read that figure narrowly. It says the schedule model reproduces a build it already has the timings
+of: pipelining, the closure rule, the executor limit and Cargo's ordering, checked against the wall
+time of the same build the weights came from. It says **nothing about whether "split this crate and
+you save X" is true.** That claim rests on a hypothetical graph nobody has built, and no
+crate-splitting experiment was performed — not once, on any project. Nobody split a crate, rebuilt,
+and compared the result against the prediction.
+
+So the two kinds of number in the output deserve different amounts of trust. The critical path, the
+bounds and the ranking describe a build that happened and are as good as the 2.1%. Every saving is an
+extrapolation from a model of a build that did not happen, and the only honest check on those is
+whether they are larger than the noise — which is why the tool says so when they are not.
 
 **The graph is checked against the build's own record of itself.** Cargo's timing report notes which
 units each completion unblocked. Those notes are incomplete, but every pair in them is a real edge,

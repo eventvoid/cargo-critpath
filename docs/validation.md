@@ -58,6 +58,13 @@ isolates the schedule model from run-to-run variation in how long units take, wh
 **Every one of the 24 runs is within 2.1%**, and 18 of them within 1%. This is the claim the tool
 rests on, and it is the only prediction it makes that is this accurate.
 
+**It validates the simulator and not the counterfactuals.** Every figure in this section predicts a
+build from that same build's own per-unit timings, so what is under test is the schedule model. No
+counterfactual is tested anywhere in this document: nobody split a crate, rebuilt the project, and
+compared the outcome against the estimate. That experiment was not performed on any of the four
+projects, and until it is, a reported saving is an extrapolation from a graph that has never been
+compiled. The `saving` fields deserve the doubt that the `critical_path` fields do not.
+
 What is being tested is the **schedule model** - pipelining, the closure rule, the executor limit,
 Cargo's cost-blind priority - not any ability to predict how long a compilation takes. Nothing here
 attempts that.
