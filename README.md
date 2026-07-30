@@ -1,5 +1,12 @@
 # cargo-critpath
 
+[![license](https://img.shields.io/crates/l/cargo-critpath?color=blue)](#licence)
+[![crates.io](https://img.shields.io/crates/v/cargo-critpath?color=blue&label=cargo-critpath)](https://crates.io/crates/cargo-critpath)
+[![crates.io](https://img.shields.io/crates/v/critpath-core?color=blue&label=critpath-core)](https://crates.io/crates/critpath-core)
+[![docs.rs](https://img.shields.io/docsrs/critpath-core?label=docs.rs)](https://docs.rs/critpath-core)
+[![rust](https://img.shields.io/crates/msrv/cargo-critpath?color=blue&label=rust)](https://github.com/eventvoid/cargo-critpath/blob/main/Cargo.toml)
+[![CI](https://github.com/eventvoid/cargo-critpath/actions/workflows/ci.yml/badge.svg)](https://github.com/eventvoid/cargo-critpath/actions/workflows/ci.yml)
+
 Our workspace builds on a 10-core machine and averages about five cores busy. Adding cores does
 nothing. `cargo build --timings` shows the gaps clearly enough, but it does not say which crate to
 change, and it does not say what changing it would buy.
@@ -133,11 +140,28 @@ measured projects fall into exactly that case, which is why the constraint colum
 
 ## Installation
 
+Two crates: the command-line tool, and the library it is built on.
+
+**`cargo-critpath`** is the tool.
+
     cargo install cargo-critpath
 
-Rust 1.74 or newer, no system dependencies. The tool depends on two crates, `serde_json` and
-`lexopt`, and pulls no procedural macros — [docs/decisions.md](https://github.com/eventvoid/cargo-critpath/blob/main/docs/decisions.md) D3 explains why that
-was worth hand-writing the argument parsing for.
+That puts a `cargo-critpath` binary on your path, which Cargo picks up as the subcommand
+`cargo critpath`. Running the same command again later upgrades it, since Cargo reinstalls when the
+installed version is out of date.
+
+**`critpath-core`** is the analysis engine, and you need it only to embed the analysis in something
+else. It comes in as a dependency of the tool, so nothing here is required to run the command above.
+
+    cargo add critpath-core
+
+`critpath-core` has no dependencies, performs no I/O and knows nothing about Cargo, so supporting a
+different build system means writing an adapter that produces a `BuildGraph` rather than changing
+anything in it. API documentation is at [docs.rs/critpath-core](https://docs.rs/critpath-core).
+
+Rust 1.74 or newer, no system dependencies. The tool itself depends on two crates, `serde_json` and
+`lexopt`, and pulls no procedural macros — [docs/decisions.md](https://github.com/eventvoid/cargo-critpath/blob/main/docs/decisions.md)
+D3 explains why that was worth hand-writing the argument parsing for.
 
 ## Use
 
@@ -262,4 +286,6 @@ Both inputs are documented, with the surprises, in
 
 ## Licence
 
-MIT or Apache-2.0, at your option.
+MIT or Apache-2.0, at your option. The full texts are in
+[LICENSE-MIT](https://github.com/eventvoid/cargo-critpath/blob/main/LICENSE-MIT) and
+[LICENSE-APACHE](https://github.com/eventvoid/cargo-critpath/blob/main/LICENSE-APACHE).
