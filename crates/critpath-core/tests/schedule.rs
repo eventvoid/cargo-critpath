@@ -617,3 +617,22 @@ fn the_area_bound_rounds_up_and_the_lower_bound_takes_whichever_term_dominates()
     assert_eq!(area_bound(&graph, j(4)), Millis::new(16));
     assert_eq!(lower_bound(&graph, &analysis, j(4)), Millis::new(21));
 }
+
+#[test]
+fn the_lower_bound_needs_only_the_analysis_it_came_from() {
+    // Taking a graph and an analysis separately let a caller pass a mismatched pair and get a
+    // number with no meaning. The analysis already knows the total work, so it is the only
+    // argument, and there is no pair left to mismatch.
+    let (graph, _) = build(
+        &[(100, None, false), (200, None, false), (300, None, false)],
+        &[],
+    );
+    let analysis = analyze(&graph);
+
+    // Three independent units, 600ms of work. On two executors no schedule beats 300ms, and the
+    // longest single unit is 300ms, so the bound is 300ms either way.
+    assert_eq!(analysis.total_work(), Millis::new(600));
+    assert_eq!(lower_bound(&analysis, j(2)), Millis::new(300));
+    // On one executor the work has to be done in series: 600ms.
+    assert_eq!(lower_bound(&analysis, j(1)), Millis::new(600));
+}
