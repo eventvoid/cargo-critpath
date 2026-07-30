@@ -294,6 +294,35 @@ runs of the same build, while the ranking by contribution does not move.
 Reporting "these 22 units are on the critical path" invites a reader to trust a boundary that is not
 stable. Reporting "these units contribute this much" is stable, and is the thing worth acting on.
 
+## D15 — Only `cargo build` is supported; other subcommands are refused by name
+
+**Decided.** The tool analyses `cargo build`, in any profile. A timing report from `cargo check`,
+`cargo test`, `cargo bench` or `cargo doc` is refused with a message naming the subcommand it
+detected and saying it is not supported, rather than analysed.
+
+**Why.** These are genuinely different builds, not variations on one. Measured on ripgrep, the dev
+build and the `cargo check` build share **exactly one unit** on their critical paths — the final
+binary. Check's critical path runs through a third-party build-script execution; dev's runs through
+the regex crates. Pipelining is worth 28% of the critical path in the dev build and 1% in check,
+because with `--emit=metadata` there is nothing after the metadata point to pipeline past.
+
+So advice derived from one is not advice about the other, and a tool that silently accepted either
+would be answering a question the user did not ask. `cargo check` is also the command developers run
+most, which makes the confusion more likely rather than less.
+
+Refusing by name is not the same as failing to parse. A parser written against the `build` alphabet
+alone fails to match 33 of ripgrep's 54 check units and yields a 21-node graph with a nonsense
+critical path — a wrong answer rather than a refusal. The subcommand is detected from the target
+strings recorded in [cargo-data-sources.md](cargo-data-sources.md) and reported explicitly.
+
+**Rejected: supporting `cargo check`.** It is cheap to collect, it is what developers run in a loop,
+and the model is *simpler* there because it degenerates to a plain longest path. It is the obvious
+next feature. It is not in this release because it has not been validated, and shipping an unvalidated
+second mode alongside a validated one would undo the point of validating the first.
+
+**Rejected: analysing whatever it is given.** That is the behaviour that produces a confident wrong
+answer, which the first non-negotiable of this project forbids.
+
 ## D9 — MSRV 1.74.0
 
 **Decided.** `rust-version = "1.74.0"`, checked in CI on that exact toolchain.

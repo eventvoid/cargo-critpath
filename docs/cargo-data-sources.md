@@ -54,10 +54,29 @@ Field by field, as measured:
 
 - `mode` is **unusable**: it is the literal string `"todo"` for every unit except build-script
   executions, which report `"run-custom-build"`.
-- `target` is a display string, not structured data. The observed alphabet is `""` for a library
-  target, `" build-script"` for compiling a build script, `" build-script (run)"` for running
-  one, and `" name \"bin\""` for a binary. Note the leading space. A plain library and a
-  proc-macro library are **indistinguishable** here — both give `""`.
+- `target` is a display string, not structured data, and its alphabet depends on the subcommand.
+  Note the leading space on every non-empty form. Observed by running each command:
+
+      cargo build            ""                        a library
+                             " build-script"           compiling a build script
+                             " build-script (run)"     running one
+                             " top \"bin\""             a binary
+      cargo build --release  the same four; only the header's Profile field differs
+      cargo check            " (check)"                a library
+                             " top \"bin\" (check)"     a binary
+                             plus "" for proc-macros, which are still fully built
+      cargo test --no-run    " leaf \"lib\" (test)"      a test unit
+                             " top \"bin\" (test)"
+                             " leaf \"lib\" (doc test)"  a doc-test unit
+
+  A plain library and a proc-macro library are **indistinguishable** here — both give `""` — which
+  is why the structure comes from the verbose log instead.
+
+  The `check` and `test` forms were missed in the first pass of this document because only
+  `cargo build` had been run. A parser written against the `build` alphabet alone does not merely
+  degrade on a `cargo check` report: on ripgrep it fails to match 33 of 54 units, every library in
+  the build, and produces a graph of 21 nodes whose critical path is meaningless. Which is the
+  argument for enumerating an alphabet by running every command rather than the obvious one.
 - `sections` times are relative to the unit's own start. On stable they are present exactly for
   pipelined units and absent otherwise. On a 28-unit build, 11 units had sections and 17 did
   not, and the 17 were precisely the 7 build-script compilations, 7 build-script executions, 2
