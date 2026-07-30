@@ -327,6 +327,49 @@ second mode alongside a validated one would undo the point of validating the fir
 **Rejected: analysing whatever it is given.** That is the behaviour that produces a confident wrong
 answer, which the first non-negotiable of this project forbids.
 
+## D16 — `drop-dependency` is not offered as a scenario in this release
+
+**Decided.** The library keeps the transformation that removes units and prunes what they dragged in
+— it is the one transformation whose resulting graph is exactly known, and it is tested. The command
+line does not offer it as a ranked recommendation.
+
+**Why.** It was measured against the four validation projects, asking how many registry packages
+exist whose removal shortens the critical path *and* which the user could actually remove by editing
+their own manifest. The answer was **1, 0, 0 and 0**, and the one — dropping `bstr` from ripgrep,
+worth about 250 ms — sits inside that project's 400 ms run-to-run spread.
+
+Everything else on these critical paths is the `proc-macro2` to `quote` to `syn` spine, which no
+Rust project can drop, or a first-party crate that the drop-dependency framing does not describe
+anyway.
+
+A scenario that produces nothing actionable on every project it has been tried against is not a
+feature, it is a list the user has to read before concluding there is nothing to do. Shipping it
+would spend the reader's attention to say nothing.
+
+**Rejected: shipping it anyway because the transformation exists.** Having built something is not a
+reason to put it in front of a user.
+
+**Rejected: removing the transformation from the library.** It is exact, cheap and tested, it is what
+a future drop-feature scenario would be built on, and an embedder analysing a workspace with genuinely
+optional heavy dependencies may well find it useful. The judgement here is about what the command
+line volunteers, not about what the library can do.
+
+## D17 — The tool says nothing about incremental rebuilds, and says so
+
+**Decided.** The analysis is of a clean build. The output and the README state plainly that it does
+not describe the incremental rebuild a developer waits on many times a day.
+
+**Why.** These are different questions with different answers, and the gap is not small. Ranking a
+workspace's crates by what a clean build's critical path says, against ranking them by the cost of
+rebuilding everything downstream when that crate is touched, gave **no overlap in the top five** on
+either of the two largest projects. `bevy_macro_utils` costs a large rebuild when touched and
+contributes nothing to the clean-build critical path.
+
+A reader who takes clean-build advice as rebuild advice will work on the wrong crate. Saying so is
+the minimum; the honest fix is to report rebuild fan-out as well, which the graph already contains
+enough information to compute. That is the most valuable thing this tool does not yet do, and it is
+not in this release because it has not been validated.
+
 ## D9 — MSRV 1.74.0
 
 **Decided.** `rust-version = "1.74.0"`, checked in CI on that exact toolchain.
