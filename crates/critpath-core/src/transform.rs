@@ -33,7 +33,17 @@ const PART_B: &str = " (part b)";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SplitDependents {
-    /// Each dependent needs exactly one part. The best a split could do.
+    /// Each dependent needs exactly one part, and it is the part that finishes first: the one
+    /// carrying less of the work, or part a when the two are equal. The best a split could do.
+    ///
+    /// Both parts inherit the same incoming edges and so can start at the same moment, which means
+    /// the smaller part reaches both its metadata and its end no later than the larger one.
+    /// Attaching every dependent to it therefore minimises every downstream start time at once,
+    /// whether an edge waits for metadata or for the whole part. No other assignment gives a
+    /// shorter critical path, which is what makes this a bound rather than one guess among many.
+    ///
+    /// It is not a plausible refactor: a part that nothing depends on would not be written. It is
+    /// the limit that a plausible refactor cannot beat.
     Optimistic,
     /// Every dependent still needs both parts. The split buys nothing structurally, and only the
     /// pipelining boundary moves.
@@ -59,7 +69,10 @@ pub enum Transform {
     /// of a part is the earliest the split could plausibly reach.
     ///
     /// Both parts inherit every incoming edge with its original kind, along with `kind` and
-    /// `requires_full_closure`. Where the outgoing edges go is decided by `dependents`.
+    /// `requires_full_closure`. Where the outgoing edges go is decided by `dependents`:
+    /// [`SplitDependents::Pessimistic`] gives every dependent an edge from both parts, and
+    /// [`SplitDependents::Optimistic`] gives each dependent one edge, from the part that finishes
+    /// first.
     ///
     /// A build script cannot be split: one invocation of one program is not divisible, and
     /// `numerator` may not exceed `denominator`.
@@ -454,24 +467,13 @@ fn split_unit(
     let first_unit = part(first_work, numerator, PART_A);
     let second_unit = part(second_work, second_share, PART_B);
 
-    // Under the optimistic assumption each dependent needs one part. Which one is decided by
-    // alternating over the dependents in ascending original identifier order: the first takes
-    // part a, the second part b, the third part a, and so on.
-    let mut takes_first_part = vec![false; graph.len()];
-    if matches!(dependents, SplitDependents::Optimistic) {
-        let mut ranked: Vec<UnitId> = graph
-            .dependents(unit)
-            .unwrap_or(&[])
-            .iter()
-            .map(|dep| dep.unit)
-            .collect();
-        ranked.sort_unstable();
-        for (rank, dependent) in ranked.iter().enumerate() {
-            if let Some(slot) = takes_first_part.get_mut(dependent.index()) {
-                *slot = rank % 2 == 0;
-            }
-        }
-    }
+    // Under the optimistic assumption every dependent needs one part, and it is the part that
+    // finishes first. Both parts inherit the same incoming edges, so they can start at the same
+    // moment, and the one carrying less work then reaches both its metadata and its end no later
+    // than the other. Attaching every dependent to it therefore minimises every downstream start
+    // time at once, whatever kind each edge is, which is what makes this a bound rather than one
+    // arbitrary assignment among many.
+    let dependents_take_first = first_unit.total <= second_unit.total;
 
     let mut builder = GraphBuilder::with_capacity(graph.len().saturating_add(1));
     let mut mapping = Vec::with_capacity(graph.len());
@@ -513,11 +515,7 @@ fn split_unit(
                         builder.add_edge(second, to, dep.kind)?;
                     }
                     SplitDependents::Optimistic => {
-                        let takes_first = takes_first_part
-                            .get(consumer.index())
-                            .copied()
-                            .unwrap_or(false);
-                        let from = if takes_first { first } else { second };
+                        let from = if dependents_take_first { first } else { second };
                         builder.add_edge(from, to, dep.kind)?;
                     }
                 }
