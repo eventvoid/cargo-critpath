@@ -224,6 +224,29 @@ factor for this machine and this project, and it would not transfer to another m
 core count, or another `codegen-units`. Fitting a curve through two points and presenting the
 result as a prediction would be worse than declining to predict.
 
+## D12 — A split is reported as a sweep over the division fraction
+
+**Decided.** The split scenario sweeps the fraction `f` that divides the crate's work, and reports
+the range of savings across that sweep alongside the dependent-assignment bounds.
+
+**Why.** The optimistic and pessimistic dependent assumptions were expected to bracket the
+uncertainty. Measured against real critical paths, they do not. At the default `f = 1/2` both halves
+finish simultaneously, so the assignment of dependents cannot affect any downstream start time, and
+the two bounds coincide exactly:
+
+    ripgrep        split regex-automata (2260ms)  saving 300ms  under both assumptions
+    async-graphql  split async_graphql  (6870ms)  saving 3395ms under both assumptions
+
+An interval whose two ends are equal is not an interval, and printing one implies a robustness the
+number does not have. The variable that actually drives the answer is `f`, and `f` is precisely
+what cannot be known before performing the split.
+
+**Rejected: keeping only the optimistic/pessimistic pair.** It is honest about a real unknown that
+happens not to bind at the default, while staying silent about the unknown that does bind.
+
+**Rejected: a single number at `f = 1/2`.** Splitting a crate exactly in half by compile time is
+the least likely outcome of a real refactor.
+
 ## D9 — MSRV 1.74.0
 
 **Decided.** `rust-version = "1.74.0"`, checked in CI on that exact toolchain.

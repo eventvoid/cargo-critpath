@@ -312,12 +312,26 @@ and which dependents need which half.
   - **Pessimistic bound** — every dependent still needs both halves. The split buys nothing
     structurally, and only the pipelining boundary moves.
 
-The answer is the interval between those bounds with the assumption printed. No point estimate
-is offered, because the tool cannot know it.
-
 A split is also not free: two crates re-parse shared imports and each pays a fixed per-crate
 cost. A per-unit overhead is added to each half, and it is a declared parameter rather than a
 hidden constant.
+
+**The dependent bounds are often degenerate, and saying otherwise would overstate what they
+bracket.** At `f = 1/2` the two halves finish at the same instant, so which dependents attach to
+which half cannot change any downstream start time, and the optimistic and pessimistic answers
+coincide exactly. Measured: splitting `regex-automata` on `ripgrep`'s critical path gave a 300 ms
+saving under both assumptions, and splitting `async_graphql` gave 3395 ms under both. The second
+case is degenerate for a further reason — it is a sink with no dependents at all.
+
+The dependent interval only opens up when the halves are unequal, or when they inherit different
+incoming constraints. So the dominant uncertainty in a split is **not** which dependents need which
+half. It is `f` itself: how the work actually divides, which is exactly what nobody knows before
+doing the split.
+
+The reported interval therefore spans a **sweep over `f`** as well as the dependent assumption, and
+the output names both. Presenting an optimistic/pessimistic pair as though it bracketed the real
+uncertainty, when at the default `f` it collapses to a single number, would be a confident-looking
+interval that hides the variable that matters.
 
 ### 9.2 Break a dependency edge
 
