@@ -254,11 +254,22 @@ disclosed in the output.
 These are stated here, and repeated in the README, so that a user meets them before being
 surprised by them.
 
-1. **Fixed weights under a changed executor count.** Per-unit durations come from one real build
-   at one `-j` value. Re-simulating at a different `J` reuses those durations, but a real
-   `rustc`'s internal codegen parallelism and its competition for memory bandwidth both change
-   with load. Predictions for `J` far from the measured value therefore drift, and in a known
-   direction: they are optimistic for large `J`.
+1. **Fixed weights under a changed executor count. This is the largest error in the model.**
+   Per-unit durations come from one real build at one `-j` value, and they are not invariant to it.
+   Measured on clean offline builds of the same commit, median of three runs, summing the per-unit
+   durations Cargo reports: `ripgrep`'s total unit work fell 23.2% and `async-graphql`'s fell 30.2%
+   when going from `-j 10` to `-j 2`. The same compilations are simply faster when fewer of them
+   compete for memory bandwidth.
+
+   Consequently, taking the graph and weights from a `-j 10` build and predicting a real `-j 2`
+   build over-predicted by 34.1% and 55.2% respectively, while the same simulator was within 0.2%
+   and 1.3% at the executor count the weights came from. The simulator is accurate; reusing weights
+   across a change in contention is not.
+
+   The direction is consistent: **extrapolating from a low executor count to a high one is
+   optimistic, and from a high one to a low one is pessimistic.** This is why the executor scan
+   leads with the knee — the point beyond which the critical path dominates — which is decided by
+   `CP` and therefore does not depend on the executor count, rather than with absolute times.
 
 2. **One unit occupies one executor.** Cargo hands `rustc` jobserver tokens, and a `rustc` process
    holds one implicit token for its lifetime while acquiring more for parallel codegen. So `J` is a
@@ -323,8 +334,16 @@ shift if the feature change alters what they compile, and that caveat is reporte
 
 ### 9.4 Change the executor count
 
-Recompute `makespan(J)` and `LB(J)` across a range of `J`, subject to systematic error 1 above,
-which is stated in the output rather than buried in a footnote.
+Recompute `CP` and `LB(J)` across a range of `J` and report the **knee**: the smallest `J` at which
+`CP >= total_work / J`, beyond which the precedence bound dominates and more executors cannot help.
+
+The knee is the number to act on. It is determined by `CP`, which does not depend on `J`, against
+total work, which rescales under contention but does not reorder — so it survives the 23% to 30%
+weight error measured in systematic error 1, whereas an absolute makespan does not.
+
+Absolute `makespan(J)` values are still reported across the range, and every one of them away from
+the executor count the weights were measured at is marked unreliable, with the direction of the
+error given.
 
 ## 10. Constraints on the core
 

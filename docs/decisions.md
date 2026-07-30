@@ -175,6 +175,55 @@ claim and a wrong-direction move in the simulation is disclosed rather than clam
 
 ---
 
+## D11 — The executor scan reports where the curve flattens, not absolute times
+
+**Decided.** `--executors` reports the **knee**: the executor count beyond which the critical path
+dominates the area bound, so more cores cannot help. Absolute makespans for executor counts far
+from the one that was measured are still shown, but labelled unreliable, with the direction of the
+error stated.
+
+**Why.** Per-unit durations are not invariant to the executor count, and the effect is large.
+Measured on this machine, comparing clean offline builds of the same commit at `-j 10` and `-j 2`,
+taking the median of three runs each and summing the per-unit durations Cargo itself reports:
+
+    project          total unit work at -j 10   at -j 2    change
+    ripgrep                        31540 ms     24220 ms   -23.2%
+    async-graphql                  82710 ms     57760 ms   -30.2%
+
+The same compilations take roughly a quarter to a third less time when fewer of them run at once,
+because they are not competing for memory bandwidth and cache. Weights harvested at a high `-j`
+are therefore inflated relative to a low-`-j` build, and vice versa.
+
+The consequence for prediction, measured the same way — graph and weights taken from a `-j 10`
+build, then used to predict a real `-j 2` build:
+
+    project          observed -j 2   predicted   error
+    ripgrep               13520 ms    18130 ms   +34.1%
+    async-graphql         33040 ms    51290 ms   +55.2%
+
+At the executor count the weights came from, the same simulator was within +0.2% and +1.3%. So the
+simulator is not the problem; reusing weights across a change in contention is.
+
+The direction is consistent and worth stating plainly: **extrapolating from a low executor count to
+a high one is optimistic, and from a high one to a low one is pessimistic.**
+
+The knee, by contrast, is robust. It is decided by the critical path, which does not depend on the
+executor count at all, against total work, which rescales but does not reorder. "Beyond about six
+cores this build stops getting faster" survives a 30% error in the weights; "this build takes
+18.1 s on two cores" does not.
+
+**Rejected: dropping the scenario.** The knee is the most actionable single number the tool
+produces, and it is trustworthy.
+
+**Rejected: reporting absolute times without the caveat.** That is the failure mode this project
+exists to avoid. A number with 34% to 55% of error in it, printed in the same typeface as a number
+with 1% of error in it, is a lie of presentation.
+
+**Rejected: calibrating the contention effect out.** Two measurements would give a correction
+factor for this machine and this project, and it would not transfer to another machine, another
+core count, or another `codegen-units`. Fitting a curve through two points and presenting the
+result as a prediction would be worse than declining to predict.
+
 ## D9 — MSRV 1.74.0
 
 **Decided.** `rust-version = "1.74.0"`, checked in CI on that exact toolchain.
