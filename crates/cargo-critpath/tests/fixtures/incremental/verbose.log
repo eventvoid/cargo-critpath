@@ -1,0 +1,11 @@
+       Fresh leaf v0.1.0 (/workspace/leaf)
+       Fresh hello-macros v0.1.0 (/workspace/hello-macros)
+       Fresh libc v0.2.189
+       Dirty mid v0.1.0 (/workspace/mid): the file `mid/src/lib.rs` has changed (1785395166.873151000s, 666163337ns after last build at 1785395166.206987663s)
+   Compiling mid v0.1.0 (/workspace/mid)
+     Running `/toolchain/bin/rustc --crate-name mid --edition=2021 mid/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 -C split-debuginfo=unpacked --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=b5dc720fb2e2feca -C extra-filename=-7dbfd6338ab580c3 --out-dir /workspace/target/debug/deps -C incremental=/workspace/target/debug/incremental -L dependency=/workspace/target/debug/deps --extern hello_macros=/workspace/target/debug/deps/libhello_macros-8c68e6fc037bee1d.dylib --extern leaf=/workspace/target/debug/deps/libleaf-a73ec2e09e26762f.rmeta`
+       Dirty app v0.1.0 (/workspace/app): the dependency `mid` was rebuilt
+   Compiling app v0.1.0 (/workspace/app)
+     Running `/toolchain/bin/rustc --crate-name demo --edition=2021 app/src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 -C split-debuginfo=unpacked --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=56269a590eae003a -C extra-filename=-7b4521e3de12749b --out-dir /workspace/target/debug/deps -C incremental=/workspace/target/debug/incremental -L dependency=/workspace/target/debug/deps --extern libc=/workspace/target/debug/deps/liblibc-52bcda4c9f95e8a3.rlib --extern mid=/workspace/target/debug/deps/libmid-7dbfd6338ab580c3.rlib`
+      Timing report saved to /workspace/target/cargo-timings/cargo-timing-20260730T070606896Z-bd32294cbeb147b9.html
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
