@@ -11,3 +11,11 @@
 //! in the repository.
 
 #![forbid(unsafe_code)]
+
+mod error;
+mod graph;
+mod millis;
+
+pub use error::GraphError;
+pub use graph::{BuildGraph, Dep, EdgeKind, GraphBuilder, Unit, UnitId, UnitKind, MAX_UNITS};
+pub use millis::Millis;

@@ -215,7 +215,10 @@ fn a_cycle_is_reported_even_when_part_of_the_graph_is_acyclic() {
             assert_eq!(units.len(), 2);
             assert!(units.contains(&x));
             assert!(units.contains(&y));
-            assert!(!units.contains(&free), "free is not on the cycle: {units:?}");
+            assert!(
+                !units.contains(&free),
+                "free is not on the cycle: {units:?}"
+            );
         }
         other => panic!("expected Cycle, got {other:?}"),
     }
@@ -267,7 +270,10 @@ fn units_iterates_every_unit_once_in_id_order() {
     let d = b.add_unit(lib("d", 3, 1)).unwrap();
     let graph = b.build().unwrap();
 
-    let seen: Vec<_> = graph.units().map(|(id, u)| (id, u.package.clone())).collect();
+    let seen: Vec<_> = graph
+        .units()
+        .map(|(id, u)| (id, u.package.clone()))
+        .collect();
     assert_eq!(
         seen,
         vec![
