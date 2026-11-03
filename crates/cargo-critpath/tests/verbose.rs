@@ -184,6 +184,55 @@ fn a_build_script_execution_names_its_package_and_its_compiled_artifact() {
     assert_eq!(run.run_artifact.as_deref(), Some("-2222222222222222"));
 }
 
+/// A package whose manifest says `build = "builder/main.rs"` rather than leaving it at `build.rs`.
+///
+/// Cargo names the compiled script after the file, so its executable is `build-script-main`, not
+/// `build-script-build`. aws-lc-sys and openssl-sys both do this. The directory is what identifies a
+/// build-script execution, exactly as it identifies the compilation; the file name only says which
+/// script it was.
+#[test]
+fn a_build_script_not_called_build_rs_is_still_recognised_when_run() {
+    let text = format!(
+        "   Compiling aws-lc-sys v0.45.0\n\
+             Running `/tc/bin/rustc --crate-name build_script_main --edition=2021 \
+             {REGISTRY}/aws-lc-sys-0.45.0/builder/main.rs --crate-type bin --emit=dep-info,link \
+             -C metadata=bbbb0000bbbb0000 -C extra-filename=-2222222222222222 \
+             --out-dir /ws/target/debug/build/aws-lc-sys-2222222222222222`\n\
+             Running `/ws/target/debug/build/aws-lc-sys-2222222222222222/build-script-main`\n\
+             Running `/ws/target/debug/build/demo-data-3333333333333333/build-script-codegen`\n"
+    );
+    let parsed = cargo_critpath::parse_verbose_log(&text).unwrap();
+
+    assert!(parsed.unrecognised.is_empty(), "{:?}", parsed.unrecognised);
+    let roles: Vec<Role> = parsed.invocations.iter().map(|i| i.role).collect();
+    assert_eq!(
+        roles,
+        vec![Role::Compile, Role::BuildScriptRun, Role::BuildScriptRun]
+    );
+    assert_eq!(parsed.invocations[0].kind, UnitKind::BuildScriptCompile);
+
+    let main = &parsed.invocations[1];
+    assert_eq!(main.kind, UnitKind::BuildScriptRun);
+    assert_eq!(main.run_package.as_deref(), Some("aws-lc-sys"));
+    assert_eq!(main.run_artifact.as_deref(), Some("-2222222222222222"));
+
+    let codegen = &parsed.invocations[2];
+    assert_eq!(codegen.run_package.as_deref(), Some("demo-data"));
+    assert_eq!(codegen.run_artifact.as_deref(), Some("-3333333333333333"));
+}
+
+#[test]
+fn an_executable_named_like_a_build_script_outside_a_build_directory_is_not_one() {
+    // The name alone is not enough: a workspace binary called `build-script-tool` runs out of
+    // `deps`, and taking it for a build script would tie it to a package it does not belong to.
+    let text = "     Running `/ws/target/debug/deps/build-script-tool-4444444444444444`\n";
+    let parsed = cargo_critpath::parse_verbose_log(text);
+    let recognised_as_run = parsed
+        .as_ref()
+        .is_ok_and(|p| p.invocations.iter().any(|i| i.role == Role::BuildScriptRun));
+    assert!(!recognised_as_run, "{parsed:?}");
+}
+
 #[test]
 fn features_are_recovered_from_cfg_flags_and_sorted() {
     let parsed = cargo_critpath::parse_verbose_log(&log()).unwrap();
