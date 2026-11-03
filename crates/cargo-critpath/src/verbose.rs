@@ -272,8 +272,11 @@ fn split_command(command: &str) -> Option<Vec<String>> {
 /// Decides what a split command was, and reads out everything the graph needs.
 fn classify(argv: &[String], position: usize) -> Option<Invocation> {
     if let Some(first) = argv.first() {
-        if file_stem(first) == "build-script-build" {
-            let (package, artifact) = split_build_directory(parent_of(first));
+        // Cargo names the executable after the script, so it is `build-script-build` only when the
+        // script is `build.rs`; `build = "builder/main.rs"` runs `build-script-main`. The directory
+        // is what identifies an execution, as it identifies the compilation below.
+        let (package, artifact) = split_build_directory(parent_of(first));
+        if package.is_some() && file_stem(first).starts_with("build-script-") {
             return Some(Invocation {
                 position,
                 role: Role::BuildScriptRun,
